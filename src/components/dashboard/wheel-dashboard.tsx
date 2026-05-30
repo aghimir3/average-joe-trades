@@ -1,0 +1,832 @@
+'use client';
+
+import { parseApiJson, apiData } from '@/lib/api/client';
+
+
+/**
+ * Wheel Strategy Analytics Dashboard
+ *
+ * Focuses on analytics unique to the wheel strategy:
+ * - Assignment tracking and statistics
+ * - Wheel cycle visualization (CSP → Stock → CC sequences)
+ * - Roll tracking and performance
+ * - Outcome breakdown (expired/assigned/closed early)
+ *
+ * Note: Income metrics and active positions are in IncomeWheelStrategy
+ */
+
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  RefreshCcw,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  ArrowRightLeft,
+  Target,
+  Clock,
+  CheckCircle,
+  Percent,
+  RotateCcw,
+  Layers,
+  ChevronRight,
+  Calendar,
+  BarChart3,
+  ArrowRight,
+  Zap,
+} from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn, formatSignedCurrency } from '@/lib/utils';
+import { WheelCalendar } from './wheel-calendar';
+
+interface WheelStats {
+  totalPremiumCollected: number;
+  coveredCallPremium: number;
+  cashSecuredPutPremium: number;
+  coveredCallCount: number;
+  cashSecuredPutCount: number;
+  expirations: number;
+  assignments: number;
+  earlyCloses: number;
+  activePositions: number;
+  winRate: number;
+  avgPremiumPerTrade: number;
+  symbols: Array<{
+    symbol: string;
+    premium: number;
+    tradeCount: number;
+    coveredCalls: number;
+    cashSecuredPuts: number;
+    assignments: number;
+  }>;
+  assignmentStats?: {
+    totalTrades: number;
+    totalAssignments: number;
+    assignmentRate: number;
+    avgDaysToAssignment: number;
+    avgPremiumOnAssigned: number;
+    avgPremiumOnExpired: number;
+    bySymbol: Array<{
+      symbol: string;
+      trades: number;
+      assignments: number;
+      assignmentRate: number;
+      avgDaysToAssignment: number;
+    }>;
+  };
+  wheelCycles?: {
+    stats: {
+      totalCycles: number;
+      activeCycles: number;
+      completedCycles: number;
+      totalPremium: number;
+      avgPremiumPerCycle: number;
+      avgCCPerCycle: number;
+    };
+    cycles: Array<{
+      id: string;
+      symbol: string;
+      startDate: string;
+      endDate: string | null;
+      status: 'active' | 'completed';
+      cspTrade: {
+        id: string;
+        openDate: string;
+        closeDate: string;
+        strike: number;
+        premium: number;
+        closeReason: string;
+      } | null;
+      stockAcquired: boolean;
+      stockAcquisitionDate: string | null;
+      stockAcquisitionPrice: number | null;
+      ccTrades: Array<{
+        id: string;
+        openDate: string;
+        closeDate: string;
+        strike: number;
+        premium: number;
+        closeReason: string;
+      }>;
+      totalPremium: number;
+      totalCycles: number;
+    }>;
+  };
+  rolls?: {
+    stats: {
+      totalRolls: number;
+      totalNetCredit: number;
+      avgNetCredit: number;
+      avgDaysExtended: number;
+      byType: {
+        up: number;
+        down: number;
+        out: number;
+        upAndOut: number;
+        downAndOut: number;
+      };
+    };
+    recentRolls: Array<{
+      id: string;
+      symbol: string;
+      rollDate: string;
+      originalStrike: number;
+      originalExpiration: string;
+      originalType: string;
+      closePremium: number;
+      newStrike: number;
+      newExpiration: string;
+      newPremium: number;
+      netCredit: number;
+      rollType: 'up' | 'down' | 'out' | 'up_and_out' | 'down_and_out';
+      daysExtended: number;
+    }>;
+  };
+}
+
+async function fetchWheelStats(accountId?: string | null): Promise<WheelStats> {
+  const params = new URLSearchParams();
+  if (accountId) {
+    params.set('brokerageAccountId', accountId);
+  }
+  const url = `/api/dashboard/wheel${params.toString() ? `?${params}` : ''}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    return {
+      totalPremiumCollected: 0,
+      coveredCallPremium: 0,
+      cashSecuredPutPremium: 0,
+      coveredCallCount: 0,
+      cashSecuredPutCount: 0,
+      expirations: 0,
+      assignments: 0,
+      earlyCloses: 0,
+      activePositions: 0,
+      winRate: 0,
+      avgPremiumPerTrade: 0,
+      symbols: [],
+    };
+  }
+  const result = await parseApiJson(response);
+  return apiData(result);
+}
+
+// formatSignedCurrency imported from @/lib/utils (use compact=true for K/M notation)
+
+interface WheelDashboardProps {
+  accountId?: string | null;
+}
+
+export function WheelDashboard({ accountId }: WheelDashboardProps) {
+  const { data: stats, isLoading, refetch } = useQuery({
+    queryKey: ['wheelStats', accountId],
+    queryFn: () => fetchWheelStats(accountId),
+    retry: false,
+  });
+
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const totalClosedTrades = (stats?.coveredCallCount ?? 0) + (stats?.cashSecuredPutCount ?? 0);
+  const hasData = stats && totalClosedTrades > 0;
+
+  if (!hasData) {
+    return null; // Income Wheel Strategy will show the empty state
+  }
+
+  return (
+    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-zinc-100 dark:border-zinc-800 bg-linear-to-r from-violet-50 to-indigo-50 dark:from-violet-950/30 dark:to-indigo-950/30">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/20">
+              <BarChart3 className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                Wheel Analytics
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                Assignments, cycles & roll tracking
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => refetch()}
+            disabled={isLoading}
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+          >
+            <RefreshCcw className={cn("h-4 w-4 text-zinc-400", isLoading && "animate-spin")} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick Stats Row */}
+      <div className="px-4 py-3 sm:px-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30">
+        <div className="flex flex-wrap gap-4 sm:gap-6">
+          <QuickStat
+            icon={<Percent className="h-3.5 w-3.5" />}
+            label="Assignment Rate"
+            value={stats.assignmentStats ? `${stats.assignmentStats.assignmentRate.toFixed(0)}%` : `${totalClosedTrades > 0 ? ((stats.assignments / totalClosedTrades) * 100).toFixed(0) : 0}%`}
+            color="violet"
+          />
+          <QuickStat
+            icon={<Layers className="h-3.5 w-3.5" />}
+            label="Wheel Cycles"
+            value={String(stats.wheelCycles?.stats.totalCycles ?? 0)}
+            color="violet"
+          />
+          <QuickStat
+            icon={<RotateCcw className="h-3.5 w-3.5" />}
+            label="Total Rolls"
+            value={String(stats.rolls?.stats.totalRolls ?? 0)}
+            color="blue"
+          />
+          <QuickStat
+            icon={<Target className="h-3.5 w-3.5" />}
+            label="Win Rate"
+            value={`${stats.winRate.toFixed(0)}%`}
+            color="emerald"
+          />
+        </div>
+      </div>
+
+      {/* Outcome Breakdown Bar */}
+      <div className="px-4 py-3 sm:px-6 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Trade Outcomes</span>
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">({totalClosedTrades} total)</span>
+        </div>
+        <div className="flex items-center gap-1 h-3 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+          {stats.expirations > 0 && (
+            <div
+              className="h-full bg-emerald-500"
+              style={{ width: `${(stats.expirations / totalClosedTrades) * 100}%` }}
+              title={`${stats.expirations} expired`}
+            />
+          )}
+          {stats.assignments > 0 && (
+            <div
+              className="h-full bg-violet-500"
+              style={{ width: `${(stats.assignments / totalClosedTrades) * 100}%` }}
+              title={`${stats.assignments} assigned`}
+            />
+          )}
+          {stats.earlyCloses > 0 && (
+            <div
+              className="h-full bg-blue-500"
+              style={{ width: `${(stats.earlyCloses / totalClosedTrades) * 100}%` }}
+              title={`${stats.earlyCloses} closed early`}
+            />
+          )}
+        </div>
+        <div className="flex items-center gap-4 mt-2">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">{stats.expirations} expired</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-violet-500" />
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">{stats.assignments} assigned</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">{stats.earlyCloses} closed early</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs Content */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="px-4 sm:px-6 py-3 border-b border-zinc-100 dark:border-zinc-800">
+          <TabsList className="grid w-full grid-cols-4 h-10 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
+            <TabsTrigger value="overview" className="text-sm font-medium rounded-md data-[state=active]:bg-violet-500! dark:data-[state=active]:bg-violet-500! data-[state=active]:text-white! dark:data-[state=active]:text-white! data-[state=active]:shadow-sm transition-all">Overview</TabsTrigger>
+            <TabsTrigger value="cycles" className="text-sm font-medium rounded-md data-[state=active]:bg-violet-500! dark:data-[state=active]:bg-violet-500! data-[state=active]:text-white! dark:data-[state=active]:text-white! data-[state=active]:shadow-sm transition-all">Cycles</TabsTrigger>
+            <TabsTrigger value="calendar" className="text-sm font-medium rounded-md data-[state=active]:bg-violet-500! dark:data-[state=active]:bg-violet-500! data-[state=active]:text-white! dark:data-[state=active]:text-white! data-[state=active]:shadow-sm transition-all">Calendar</TabsTrigger>
+            <TabsTrigger value="rolls" className="text-sm font-medium rounded-md data-[state=active]:bg-violet-500! dark:data-[state=active]:bg-violet-500! data-[state=active]:text-white! dark:data-[state=active]:text-white! data-[state=active]:shadow-sm transition-all">Rolls</TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="p-4 sm:p-6 space-y-4 mt-0">
+          {/* Assignment Details */}
+          {stats.assignmentStats && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <MetricCard
+                icon={<ArrowRightLeft className="h-4 w-4" />}
+                label="Total Assigned"
+                value={stats.assignmentStats.totalAssignments}
+                color="violet"
+              />
+              <MetricCard
+                icon={<Clock className="h-4 w-4" />}
+                label="Avg Days to Assign"
+                value={`${stats.assignmentStats.avgDaysToAssignment.toFixed(0)}d`}
+                color="violet"
+              />
+              <MetricCard
+                icon={<DollarSign className="h-4 w-4" />}
+                label="Avg Premium (Assigned)"
+                value={formatSignedCurrency(stats.assignmentStats.avgPremiumOnAssigned, true)}
+                color="emerald"
+              />
+              <MetricCard
+                icon={<CheckCircle className="h-4 w-4" />}
+                label="Avg Premium (Expired)"
+                value={formatSignedCurrency(stats.assignmentStats.avgPremiumOnExpired, true)}
+                color="emerald"
+              />
+            </div>
+          )}
+
+          {/* Symbol Assignment Leaderboard */}
+          {stats.assignmentStats?.bySymbol && stats.assignmentStats.bySymbol.length > 0 && (
+            <div className="rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+              <div className="px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
+                <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Assignment Rate by Symbol
+                </h3>
+              </div>
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {stats.assignmentStats.bySymbol.slice(0, 5).map(sym => (
+                  <div key={sym.symbol} className="px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="font-semibold text-zinc-900 dark:text-zinc-100">{sym.symbol}</span>
+                      <span className="text-xs text-zinc-400">{sym.trades} trades</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <AssignmentRateBadge rate={sym.assignmentRate} />
+                      {sym.avgDaysToAssignment > 0 && (
+                        <span className="text-xs text-zinc-500">{sym.avgDaysToAssignment.toFixed(0)}d avg</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top Performing Symbols */}
+          {stats.symbols.length > 0 && (
+            <div className="rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+              <div className="px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
+                <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Top Symbols by Premium
+                </h3>
+              </div>
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {stats.symbols.slice(0, 5).map((sym, idx) => (
+                  <div key={sym.symbol} className="px-4 py-3 flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-xs font-bold text-violet-600 dark:text-violet-400">
+                      {idx + 1}
+                    </span>
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-100">{sym.symbol}</span>
+                    <span className="text-xs text-zinc-400 flex-1">
+                      {sym.coveredCalls > 0 && `${sym.coveredCalls} CC`}
+                      {sym.coveredCalls > 0 && sym.cashSecuredPuts > 0 && ' · '}
+                      {sym.cashSecuredPuts > 0 && `${sym.cashSecuredPuts} CSP`}
+                    </span>
+                    <span className={cn(
+                      "font-bold",
+                      sym.premium >= 0 ? "text-rh-green" : "text-rh-red"
+                    )}>
+                      {formatSignedCurrency(sym.premium, true)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Cycles Tab */}
+        <TabsContent value="cycles" className="p-4 sm:p-6 space-y-4 mt-0">
+          {stats.wheelCycles ? (
+            <>
+              {/* Cycle Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <MetricCard
+                  icon={<Layers className="h-4 w-4" />}
+                  label="Total Cycles"
+                  value={stats.wheelCycles.stats.totalCycles}
+                  color="violet"
+                />
+                <MetricCard
+                  icon={<Zap className="h-4 w-4" />}
+                  label="Active Cycles"
+                  value={stats.wheelCycles.stats.activeCycles}
+                  color="blue"
+                />
+                <MetricCard
+                  icon={<DollarSign className="h-4 w-4" />}
+                  label="Total Cycle Premium"
+                  value={formatSignedCurrency(stats.wheelCycles.stats.totalPremium, true)}
+                  color="emerald"
+                />
+                <MetricCard
+                  icon={<Target className="h-4 w-4" />}
+                  label="Avg CC per Cycle"
+                  value={stats.wheelCycles.stats.avgCCPerCycle.toFixed(1)}
+                  color="violet"
+                />
+              </div>
+
+              {/* Cycle List */}
+              {stats.wheelCycles.cycles.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.wheelCycles.cycles.slice(0, 5).map(cycle => (
+                    <CycleCard key={cycle.id} cycle={cycle} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={<Layers className="h-8 w-8" />}
+                  title="No wheel cycles detected"
+                  description="Cycles start when a CSP gets assigned"
+                />
+              )}
+            </>
+          ) : (
+            <EmptyState
+              icon={<Layers className="h-8 w-8" />}
+              title="No cycle data"
+              description="Trade more wheel options to see cycle analytics"
+            />
+          )}
+        </TabsContent>
+
+        {/* Calendar Tab */}
+        <TabsContent value="calendar" className="p-4 sm:p-6 mt-0">
+          <WheelCalendar accountId={accountId} />
+        </TabsContent>
+
+        {/* Rolls Tab */}
+        <TabsContent value="rolls" className="p-4 sm:p-6 space-y-4 mt-0">
+          {stats.rolls ? (
+            <>
+              {/* Roll Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <MetricCard
+                  icon={<RotateCcw className="h-4 w-4" />}
+                  label="Total Rolls"
+                  value={stats.rolls.stats.totalRolls}
+                  color="blue"
+                />
+                <MetricCard
+                  icon={<DollarSign className="h-4 w-4" />}
+                  label="Total Net Credit"
+                  value={formatSignedCurrency(stats.rolls.stats.totalNetCredit, true)}
+                  color={stats.rolls.stats.totalNetCredit >= 0 ? "emerald" : "red"}
+                />
+                <MetricCard
+                  icon={<Target className="h-4 w-4" />}
+                  label="Avg Credit/Roll"
+                  value={formatSignedCurrency(stats.rolls.stats.avgNetCredit, true)}
+                  color={stats.rolls.stats.avgNetCredit >= 0 ? "emerald" : "red"}
+                />
+                <MetricCard
+                  icon={<Calendar className="h-4 w-4" />}
+                  label="Avg Days Extended"
+                  value={`+${stats.rolls.stats.avgDaysExtended.toFixed(0)}d`}
+                  color="amber"
+                />
+              </div>
+
+              {/* Roll Type Breakdown */}
+              {stats.rolls.stats.totalRolls > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {stats.rolls.stats.byType.up > 0 && (
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      <TrendingUp className="h-3 w-3 mr-1" />
+                      Up: {stats.rolls.stats.byType.up}
+                    </Badge>
+                  )}
+                  {stats.rolls.stats.byType.down > 0 && (
+                    <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                      <TrendingDown className="h-3 w-3 mr-1" />
+                      Down: {stats.rolls.stats.byType.down}
+                    </Badge>
+                  )}
+                  {stats.rolls.stats.byType.out > 0 && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                      <ChevronRight className="h-3 w-3 mr-1" />
+                      Out: {stats.rolls.stats.byType.out}
+                    </Badge>
+                  )}
+                  {stats.rolls.stats.byType.upAndOut > 0 && (
+                    <Badge variant="secondary" className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                      Up & Out: {stats.rolls.stats.byType.upAndOut}
+                    </Badge>
+                  )}
+                  {stats.rolls.stats.byType.downAndOut > 0 && (
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      Down & Out: {stats.rolls.stats.byType.downAndOut}
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Recent Rolls */}
+              {stats.rolls.recentRolls.length > 0 ? (
+                <div className="space-y-2">
+                  {stats.rolls.recentRolls.slice(0, 5).map(roll => (
+                    <RollCard key={roll.id} roll={roll} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={<RotateCcw className="h-8 w-8" />}
+                  title="No rolls detected"
+                  description="Rolls are detected when you close and reopen within a day"
+                />
+              )}
+            </>
+          ) : (
+            <EmptyState
+              icon={<RotateCcw className="h-8 w-8" />}
+              title="No roll data"
+              description="Roll options to see analytics here"
+            />
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ============================================================================
+// Sub-components
+// ============================================================================
+
+function QuickStat({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color: 'amber' | 'violet' | 'blue' | 'emerald';
+}) {
+  const colorClasses = {
+    amber: 'text-amber-600 dark:text-amber-400',
+    violet: 'text-violet-600 dark:text-violet-400',
+    blue: 'text-blue-600 dark:text-blue-400',
+    emerald: 'text-rh-green',
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={colorClasses[color]}>{icon}</span>
+      <div>
+        <p className={cn("text-sm font-bold", colorClasses[color])}>{value}</p>
+        <p className="text-[10px] text-zinc-400">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  color: 'amber' | 'violet' | 'blue' | 'emerald' | 'red';
+}) {
+  const bgClasses = {
+    amber: 'bg-amber-50 dark:bg-amber-900/20',
+    violet: 'bg-violet-50 dark:bg-violet-900/20',
+    blue: 'bg-blue-50 dark:bg-blue-900/20',
+    emerald: 'bg-rh-green/10',
+    red: 'bg-rh-red/10',
+  };
+  const textClasses = {
+    amber: 'text-amber-600 dark:text-amber-400',
+    violet: 'text-violet-600 dark:text-violet-400',
+    blue: 'text-blue-600 dark:text-blue-400',
+    emerald: 'text-rh-green',
+    red: 'text-rh-red',
+  };
+  const labelClasses = {
+    amber: 'text-amber-700 dark:text-amber-300',
+    violet: 'text-violet-700 dark:text-violet-300',
+    blue: 'text-blue-700 dark:text-blue-300',
+    emerald: 'text-rh-green',
+    red: 'text-rh-red',
+  };
+
+  return (
+    <div className={cn("p-3 rounded-xl", bgClasses[color])}>
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className={textClasses[color]}>{icon}</span>
+        <span className={cn("text-xs font-medium", labelClasses[color])}>{label}</span>
+      </div>
+      <p className={cn("text-lg font-bold", textClasses[color])}>{value}</p>
+    </div>
+  );
+}
+
+function AssignmentRateBadge({ rate }: { rate: number }) {
+  const getBadgeColor = () => {
+    if (rate >= 50) return 'bg-rh-red/20 text-rh-red';
+    if (rate >= 30) return 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400';
+    return 'bg-rh-green/20 text-rh-green';
+  };
+
+  return (
+    <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium", getBadgeColor())}>
+      {rate.toFixed(0)}% assigned
+    </span>
+  );
+}
+
+function EmptyState({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div className="text-zinc-300 dark:text-zinc-600 mb-3">{icon}</div>
+      <p className="text-zinc-500 dark:text-zinc-400">{title}</p>
+      <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">{description}</p>
+    </div>
+  );
+}
+
+interface CycleCardProps {
+  cycle: {
+    id: string;
+    symbol: string;
+    startDate: string;
+    endDate: string | null;
+    status: 'active' | 'completed';
+    cspTrade: {
+      strike: number;
+      premium: number;
+      closeReason: string;
+    } | null;
+    stockAcquired: boolean;
+    stockAcquisitionPrice: number | null;
+    ccTrades: Array<{
+      id: string;
+      strike: number;
+      premium: number;
+      closeReason: string;
+    }>;
+    totalPremium: number;
+    totalCycles: number;
+  };
+}
+
+function CycleCard({ cycle }: CycleCardProps) {
+  return (
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-lg text-zinc-900 dark:text-zinc-100">{cycle.symbol}</span>
+          <Badge
+            variant="secondary"
+            className={cycle.status === 'active'
+              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+            }
+          >
+            {cycle.status === 'active' ? 'Active' : 'Completed'}
+          </Badge>
+        </div>
+        <span className={cn(
+          "font-bold",
+          cycle.totalPremium >= 0 ? "text-rh-green" : "text-rh-red"
+        )}>
+          {formatSignedCurrency(cycle.totalPremium)}
+        </span>
+      </div>
+
+      {/* Timeline */}
+      <div className="px-4 py-3 space-y-2">
+        {/* CSP Leg */}
+        {cycle.cspTrade && (
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 rounded-full bg-purple-500" />
+            <span className="text-purple-600 dark:text-purple-400 font-medium">CSP</span>
+            <span className="text-zinc-500">${cycle.cspTrade.strike}</span>
+            <ArrowRight className="h-3 w-3 text-zinc-400" />
+            <Badge variant="secondary" className={
+              cycle.cspTrade.closeReason === 'assigned'
+                ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 text-xs'
+                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 text-xs'
+            }>
+              {cycle.cspTrade.closeReason === 'assigned' ? 'Assigned' : 'Expired'}
+            </Badge>
+            <span className="ml-auto text-rh-green font-medium">
+              {formatSignedCurrency(cycle.cspTrade.premium)}
+            </span>
+          </div>
+        )}
+
+        {/* Stock indicator */}
+        {cycle.stockAcquired && (
+          <div className="flex items-center gap-2 text-xs text-zinc-500 pl-4 border-l-2 border-zinc-200 dark:border-zinc-700 ml-1">
+            Stock @ ${cycle.stockAcquisitionPrice}
+          </div>
+        )}
+
+        {/* CC Legs */}
+        {cycle.ccTrades.map((cc, idx) => (
+          <div key={cc.id} className="flex items-center gap-2 text-sm pl-4 border-l-2 border-zinc-200 dark:border-zinc-700 ml-1">
+            <div className="w-2 h-2 rounded-full bg-blue-500" />
+            <span className="text-blue-600 dark:text-blue-400 font-medium">CC #{idx + 1}</span>
+            <span className="text-zinc-500">${cc.strike}</span>
+            <ArrowRight className="h-3 w-3 text-zinc-400" />
+            <Badge variant="secondary" className={cn(
+              "text-xs",
+              cc.closeReason === 'assigned'
+                ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
+                : cc.closeReason === 'expired'
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+            )}>
+              {cc.closeReason === 'assigned' ? 'Called Away' : cc.closeReason === 'expired' ? 'Expired' : 'Closed'}
+            </Badge>
+            <span className="ml-auto text-rh-green font-medium">
+              {formatSignedCurrency(cc.premium)}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="px-4 py-2 bg-zinc-50 dark:bg-zinc-800/30 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs text-zinc-500">
+        <span className="flex items-center gap-1">
+          <Calendar className="h-3 w-3" />
+          {cycle.startDate} - {cycle.endDate || 'Ongoing'}
+        </span>
+        <span>{cycle.totalCycles} covered call{cycle.totalCycles !== 1 ? 's' : ''}</span>
+      </div>
+    </div>
+  );
+}
+
+interface RollCardProps {
+  roll: {
+    id: string;
+    symbol: string;
+    originalStrike: number;
+    originalExpiration: string;
+    originalType: string;
+    newStrike: number;
+    newExpiration: string;
+    netCredit: number;
+    rollType: string;
+    daysExtended: number;
+  };
+}
+
+function RollCard({ roll }: RollCardProps) {
+  const rollTypeColor = () => {
+    if (roll.rollType.includes('up')) return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+    if (roll.rollType.includes('down')) return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+    return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+  };
+
+  return (
+    <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-zinc-900 dark:text-zinc-100">{roll.symbol}</span>
+          <span className="text-xs text-zinc-500">{roll.originalType}</span>
+          <Badge variant="secondary" className={cn("text-xs", rollTypeColor())}>
+            {roll.rollType.replace('_', ' & ')}
+          </Badge>
+        </div>
+        <span className={cn(
+          "font-bold",
+          roll.netCredit >= 0 ? "text-rh-green" : "text-rh-red"
+        )}>
+          {formatSignedCurrency(roll.netCredit)}
+        </span>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-zinc-500">
+        <span>${roll.originalStrike} ({roll.originalExpiration})</span>
+        <ArrowRight className="h-3 w-3" />
+        <span>${roll.newStrike} ({roll.newExpiration})</span>
+        <span className="ml-auto text-amber-600 dark:text-amber-400">+{roll.daysExtended} days</span>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,1040 @@
+/**
+ * Global CSS styles for Average Joe Trades.
+ *
+ * Robinhood-Inspired Design System
+ * =================================
+ * A clean, minimal, high-contrast dark UI designed to make
+ * Robinhood users feel instantly at home.
+ *
+ * Includes:
+ * - Tailwind CSS v4 base import
+ * - Comprehensive color palette
+ * - 3-tier text hierarchy (primary, secondary, muted)
+ * - Spacing scale (4px baseline grid)
+ * - Transition presets
+ * - Dark mode support
+ * - Accessibility features
+ */
+
+@import "tailwindcss";
+
+@plugin "@tailwindcss/typography";
+
+/* ============================================
+   Dark Mode Configuration (class-based)
+   ============================================ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================
+   Design Tokens - Light Mode (Default)
+   ============================================ */
+
+:root {
+  /* -----------------------------------------
+     Robinhood Brand Colors
+     ----------------------------------------- */
+  --rh-green: #00c805;
+  --rh-green-hover: #00a804;
+  --rh-green-light: #e8f9e9;
+  --rh-green-dark: #009904;
+
+  --rh-red: #ff5000;
+  --rh-red-hover: #e64600;
+  --rh-red-light: #fff0eb;
+  --rh-red-dark: #cc4000;
+
+  /* Semantic Profit/Loss aliases */
+  --rh-profit: var(--rh-green);
+  --rh-profit-bg: var(--rh-green-light);
+  --rh-loss: var(--rh-red);
+  --rh-loss-bg: var(--rh-red-light);
+
+  /* -----------------------------------------
+     Background & Surface Colors
+     ----------------------------------------- */
+  --background: #ffffff;
+  --background-subtle: #fafafa;
+  --foreground: #0a0a0a;
+
+  --card: #ffffff;
+  --card-hover: #fafafa;
+  --card-foreground: #0a0a0a;
+  --card-background: #ffffff;
+
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+
+  /* -----------------------------------------
+     Text Color Hierarchy (3-tier system)
+     ----------------------------------------- */
+  --text-primary: #0a0a0a;
+  --text-secondary: #525252;
+  --text-muted: #a3a3a3;
+  --text-disabled: #d4d4d4;
+  --text-inverse: #fafafa;
+
+  /* -----------------------------------------
+     Interactive Colors
+     ----------------------------------------- */
+  --primary: #0a0a0a;
+  --primary-hover: #262626;
+  --primary-foreground: #fafafa;
+
+  --secondary: #f5f5f5;
+  --secondary-hover: #e5e5e5;
+  --secondary-foreground: #0a0a0a;
+
+  --muted: #f5f5f5;
+  --muted-foreground: #737373;
+
+  --accent: #f5f5f5;
+  --accent-foreground: #0a0a0a;
+
+  /* -----------------------------------------
+     Semantic Colors
+     ----------------------------------------- */
+  --destructive: #ef4444;
+  --destructive-hover: #dc2626;
+  --destructive-foreground: #fafafa;
+
+  --success: var(--rh-green);
+  --success-hover: var(--rh-green-hover);
+  --success-foreground: #ffffff;
+  --success-bg: var(--rh-green-light);
+
+  --warning: #f59e0b;
+  --warning-hover: #d97706;
+  --warning-foreground: #0a0a0a;
+  --warning-bg: #fef3c7;
+
+  --info: #3b82f6;
+  --info-hover: #2563eb;
+  --info-foreground: #ffffff;
+  --info-bg: #dbeafe;
+
+  /* -----------------------------------------
+     Border & Ring Colors
+     ----------------------------------------- */
+  --border: #e5e5e5;
+  --border-subtle: #f5f5f5;
+  --input: #e5e5e5;
+  --input-background: #ffffff;
+  --input-border: #e5e5e5;
+  --input-focus: var(--rh-green);
+  --ring: var(--rh-green);
+  --ring-offset: #ffffff;
+
+  /* -----------------------------------------
+     Chart Colors
+     ----------------------------------------- */
+  --chart-1: var(--rh-green);
+  --chart-2: #3b82f6;
+  --chart-3: #8b5cf6;
+  --chart-4: #f59e0b;
+  --chart-5: #ec4899;
+
+  /* -----------------------------------------
+     Spacing Scale (4px baseline grid)
+     ----------------------------------------- */
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* -----------------------------------------
+     Typography Scale
+     ----------------------------------------- */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+
+  --line-height-tight: 1.25;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+
+  /* -----------------------------------------
+     Border Radius Scale
+     ----------------------------------------- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+  --radius: 8px;
+
+  /* -----------------------------------------
+     Shadow Scale
+     ----------------------------------------- */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-green: 0 4px 14px 0 rgb(0 200 5 / 0.15);
+  --shadow-red: 0 4px 14px 0 rgb(255 80 0 / 0.15);
+
+  /* -----------------------------------------
+     Transition Presets
+     ----------------------------------------- */
+  --transition-fast: 100ms ease;
+  --transition-base: 150ms ease;
+  --transition-slow: 200ms ease;
+  --transition-slower: 300ms ease;
+}
+
+/* ============================================
+   Design Tokens - Dark Mode
+   ============================================ */
+
+.dark,
+.dark :root {
+  /* Robinhood Brand Colors (adjusted for dark) */
+  --rh-green: #00c805;
+  --rh-green-hover: #00e006;
+  --rh-green-light: #0a2f0c;
+  --rh-green-dark: #00a804;
+
+  --rh-red: #ff6b35;
+  --rh-red-hover: #ff8559;
+  --rh-red-light: #2f140a;
+  --rh-red-dark: #e64600;
+
+  --rh-profit: var(--rh-green);
+  --rh-profit-bg: var(--rh-green-light);
+  --rh-loss: var(--rh-red);
+  --rh-loss-bg: var(--rh-red-light);
+
+  /* Background & Surface Colors */
+  --background: #0a0a0a;
+  --background-subtle: #0f0f0f;
+  --foreground: #fafafa;
+
+  --card: #141414;
+  --card-hover: #1a1a1a;
+  --card-foreground: #fafafa;
+  --card-background: #141414;
+
+  --popover: #1a1a1a;
+  --popover-foreground: #fafafa;
+
+  /* Text Color Hierarchy */
+  --text-primary: #fafafa;
+  --text-secondary: #a3a3a3;
+  --text-muted: #737373;
+  --text-disabled: #525252;
+  --text-inverse: #0a0a0a;
+
+  /* Interactive Colors */
+  --primary: #fafafa;
+  --primary-hover: #e5e5e5;
+  --primary-foreground: #0a0a0a;
+
+  --secondary: #262626;
+  --secondary-hover: #333333;
+  --secondary-foreground: #fafafa;
+
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+
+  --accent: #262626;
+  --accent-foreground: #fafafa;
+
+  /* Semantic Colors */
+  --destructive: #f87171;
+  --destructive-hover: #fca5a5;
+  --destructive-foreground: #0a0a0a;
+
+  --success: var(--rh-green);
+  --success-hover: var(--rh-green-hover);
+  --success-foreground: #0a0a0a;
+  --success-bg: var(--rh-green-light);
+
+  --warning: #fbbf24;
+  --warning-hover: #fcd34d;
+  --warning-foreground: #0a0a0a;
+  --warning-bg: #422006;
+
+  --info: #60a5fa;
+  --info-hover: #93c5fd;
+  --info-foreground: #0a0a0a;
+  --info-bg: #1e3a5f;
+
+  /* Border & Ring Colors */
+  --border: #262626;
+  --border-subtle: #1a1a1a;
+  --input: #262626;
+  --input-background: #141414;
+  --input-border: #262626;
+  --ring-offset: #0a0a0a;
+
+  /* Chart Colors */
+  --chart-1: var(--rh-green);
+  --chart-2: #60a5fa;
+  --chart-3: #a78bfa;
+  --chart-4: #fbbf24;
+  --chart-5: #f472b6;
+
+  /* Shadow Scale (subtle on dark) */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+  --shadow-green: 0 4px 20px 0 rgb(0 200 5 / 0.25);
+  --shadow-red: 0 4px 20px 0 rgb(255 107 53 / 0.25);
+}
+
+/* System preference fallback */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #0a0a0a;
+    --background-subtle: #0f0f0f;
+    --foreground: #fafafa;
+    --card: #141414;
+    --card-hover: #1a1a1a;
+    --card-foreground: #fafafa;
+    --card-background: #141414;
+    --popover: #1a1a1a;
+    --popover-foreground: #fafafa;
+    --text-primary: #fafafa;
+    --text-secondary: #a3a3a3;
+    --text-muted: #737373;
+    --text-disabled: #525252;
+    --text-inverse: #0a0a0a;
+    --primary: #fafafa;
+    --primary-hover: #e5e5e5;
+    --primary-foreground: #0a0a0a;
+    --secondary: #262626;
+    --secondary-hover: #333333;
+    --secondary-foreground: #fafafa;
+    --muted: #262626;
+    --muted-foreground: #a3a3a3;
+    --accent: #262626;
+    --accent-foreground: #fafafa;
+    --border: #262626;
+    --border-subtle: #1a1a1a;
+    --input: #262626;
+    --input-background: #141414;
+    --input-border: #262626;
+    --ring-offset: #0a0a0a;
+  }
+}
+
+/* ============================================
+   Tailwind Theme Configuration
+   ============================================ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Robinhood brand colors */
+  --color-rh-green: var(--rh-green);
+  --color-rh-green-hover: var(--rh-green-hover);
+  --color-rh-green-light: var(--rh-green-light);
+  --color-rh-red: var(--rh-red);
+  --color-rh-red-hover: var(--rh-red-hover);
+  --color-rh-red-light: var(--rh-red-light);
+
+  /* Semantic aliases */
+  --color-rh-profit: var(--rh-profit);
+  --color-rh-loss: var(--rh-loss);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  overflow-x: hidden;
+}
+
+/* ============================================
+   Typography Utility Classes
+   ============================================ */
+
+.text-display {
+  font-size: var(--font-size-4xl);
+  font-weight: 700;
+  line-height: var(--line-height-tight);
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+.text-heading-xl {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  line-height: var(--line-height-tight);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.text-heading {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  line-height: var(--line-height-snug);
+  color: var(--text-primary);
+}
+
+.text-subheading {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  line-height: var(--line-height-snug);
+  color: var(--text-primary);
+}
+
+.text-body {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--text-secondary);
+}
+
+.text-body-lg {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--text-secondary);
+}
+
+.text-caption {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--text-muted);
+}
+
+.text-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: var(--line-height-normal);
+  color: var(--text-primary);
+}
+
+.text-stat {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-stat-sm {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================
+   Profit/Loss Color Utilities
+   ============================================ */
+
+.text-profit {
+  color: var(--rh-profit);
+}
+
+.text-loss {
+  color: var(--rh-loss);
+}
+
+.bg-profit {
+  background-color: var(--rh-profit-bg);
+}
+
+.bg-loss {
+  background-color: var(--rh-loss-bg);
+}
+
+.border-profit {
+  border-color: var(--rh-profit);
+}
+
+.border-loss {
+  border-color: var(--rh-loss);
+}
+
+/* ============================================
+   Focus & Ring Utilities
+   ============================================ */
+
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.focus-ring-inset:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.focus-ring-green:focus-visible {
+  outline: 2px solid var(--rh-green);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-green);
+}
+
+/* ============================================
+   Animation Utilities
+   ============================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgb(0 200 5 / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgb(0 200 5 / 0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Register skeleton-shimmer animation with Tailwind */
+@theme {
+  --animate-skeleton-shimmer: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 0.2s ease-out;
+}
+
+.animate-slide-in-bottom {
+  animation: slideInFromBottom 0.25s ease-out;
+}
+
+.animate-slide-in-top {
+  animation: slideInFromTop 0.25s ease-out;
+}
+
+.animate-pulse-green {
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--border) 50%,
+    var(--muted) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* ============================================
+   Interactive Utilities
+   ============================================ */
+
+.interactive {
+  transition: all 150ms ease;
+}
+
+.interactive:hover {
+  transform: translateY(-1px);
+}
+
+.interactive:active {
+  transform: translateY(0);
+}
+
+.press-effect {
+  transition: transform 150ms ease;
+}
+
+.press-effect:active {
+  transform: scale(0.98);
+}
+
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.hover-bg {
+  transition: background-color 0.15s ease;
+}
+
+.hover-bg:hover {
+  background-color: var(--card-hover);
+}
+
+/* ============================================
+   Custom Scrollbar
+   ============================================ */
+
+/* Firefox — thin scrollbar using design system colors */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
+}
+
+/* Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Floating thumb: 2px transparent border + background-clip creates visible padding */
+::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.15s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-secondary);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+/* Custom visible scrollbar - compact, transparent track */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.15s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-secondary);
+}
+
+/* Hide scrollbar on mobile/touch devices - keeps scroll but hides native scrollbar */
+@media (max-width: 768px), (pointer: coarse) {
+  html {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  ::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ============================================
+   Form Styles
+   ============================================ */
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  color-scheme: light;
+}
+
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) input[type="date"],
+  :root:not(.light) input[type="time"],
+  :root:not(.light) input[type="datetime-local"] {
+    color-scheme: dark;
+  }
+}
+
+/* ============================================
+   Layout Utilities
+   ============================================ */
+
+.safe-area-bottom {
+  padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+}
+
+.safe-area-top {
+  padding-top: max(var(--space-4), env(safe-area-inset-top));
+}
+
+.container-sm {
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.container-md {
+  max-width: 768px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.container-lg {
+  max-width: 1024px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.container-xl {
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ============================================
+   Component Overrides
+   ============================================ */
+
+[data-state="open"] > [data-radix-dialog-overlay],
+[data-state="open"] > [data-radix-alert-dialog-overlay] {
+  animation: fadeIn 0.15s ease-out;
+}
+
+.drawer-handle {
+  width: 48px;
+  height: 4px;
+  background-color: var(--border);
+  border-radius: var(--radius-full);
+  margin: var(--space-2) auto var(--space-4);
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   Scrollbar-hidden utility (for swipeable tab bars)
+   ============================================ */
+
+@utility scrollbar-hidden {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ============================================
+   App Background Grids
+   ============================================ */
+
+.app-dot-grid {
+  background-image: radial-gradient(circle, rgba(63, 63, 70, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark .app-dot-grid {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+
+.demo-dot-grid {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ============================================
+   Demo Tour (driver.js) Theme Override
+   ============================================ */
+
+/* Higher specificity (0-2-0) to beat dynamically-imported driver.js defaults */
+.driver-popover.demo-tour-popover {
+  background-color: var(--card) !important;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 20px;
+  min-width: 280px;
+  max-width: 360px;
+  box-shadow: var(--shadow-xl);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.driver-popover.demo-tour-popover .driver-popover-title {
+  font: unset;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: inherit;
+  line-height: var(--line-height-snug);
+}
+
+.driver-popover.demo-tour-popover .driver-popover-description {
+  font: unset;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-family: inherit;
+  line-height: var(--line-height-relaxed);
+}
+
+.driver-popover.demo-tour-popover .driver-popover-close-btn {
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+}
+
+.driver-popover.demo-tour-popover .driver-popover-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.driver-popover.demo-tour-popover .driver-popover-progress-text {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.driver-popover.demo-tour-popover .driver-popover-footer button {
+  all: unset;
+  display: inline-block;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background-color: var(--secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.driver-popover.demo-tour-popover .driver-popover-footer button:hover {
+  background-color: var(--secondary-hover);
+}
+
+/* "Next" and "Done" buttons get the brand green */
+.driver-popover.demo-tour-popover .driver-popover-navigation-btns button:last-child {
+  background-color: var(--rh-green);
+  border-color: var(--rh-green);
+  color: #fff;
+}
+
+.driver-popover.demo-tour-popover .driver-popover-navigation-btns button:last-child:hover {
+  background-color: var(--rh-green-hover);
+  border-color: var(--rh-green-hover);
+}
+
+/* Arrow inherits popover background */
+.driver-popover.demo-tour-popover .driver-popover-arrow {
+  border-color: var(--card);
+}
+
+.driver-popover.demo-tour-popover .driver-popover-arrow-side-left {
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-top-color: transparent;
+}
+
+.driver-popover.demo-tour-popover .driver-popover-arrow-side-right {
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  border-top-color: transparent;
+}
+
+.driver-popover.demo-tour-popover .driver-popover-arrow-side-top {
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+}
+
+.driver-popover.demo-tour-popover .driver-popover-arrow-side-bottom {
+  border-left-color: transparent;
+  border-top-color: transparent;
+  border-right-color: transparent;
+}
+
+/* Mobile: constrain popover to viewport and reduce padding */
+@media (max-width: 480px) {
+  .driver-popover.demo-tour-popover {
+    min-width: unset;
+    max-width: calc(100vw - 24px);
+    padding: 16px;
+  }
+
+  .driver-popover.demo-tour-popover .driver-popover-title {
+    font-size: 15px;
+  }
+
+  .driver-popover.demo-tour-popover .driver-popover-description {
+    font-size: 13px;
+  }
+
+  .driver-popover.demo-tour-popover .driver-popover-footer button {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+}
