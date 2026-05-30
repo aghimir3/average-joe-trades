@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+  <defs>
+    <!-- Brand gradient: emerald → teal -->
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+
+    <!-- Chart line gradient (left to right, fades in) -->
+    <linearGradient id="chartGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00c805" stop-opacity="0"/>
+      <stop offset="20%" stop-color="#00c805" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#00c805" stop-opacity="0.9"/>
+    </linearGradient>
+
+    <!-- Fill under chart line -->
+    <linearGradient id="chartFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00c805" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#00c805" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Ambient glow (left side, behind text) -->
+    <radialGradient id="glowLeft" cx="30%" cy="50%" r="35%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Ambient glow (right side, behind chart) -->
+    <radialGradient id="glowRight" cx="75%" cy="45%" r="30%">
+      <stop offset="0%" stop-color="#00c805" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#00c805" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Chart line glow -->
+    <filter id="lineGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Stronger glow for arrow -->
+    <filter id="arrowGlow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- ====== BACKGROUND ====== -->
+  <rect width="960" height="540" fill="#09090b"/>
+
+  <!-- Subtle top/bottom border lines -->
+  <line x1="0" y1="1" x2="960" y2="1" stroke="#1a1a1a" stroke-width="1"/>
+  <line x1="0" y1="539" x2="960" y2="539" stroke="#1a1a1a" stroke-width="1"/>
+
+  <!-- Ambient glows -->
+  <rect width="960" height="540" fill="url(#glowLeft)"/>
+  <rect width="960" height="540" fill="url(#glowRight)"/>
+
+  <!-- ====== GRID DOTS (trading terminal feel) ====== -->
+  <g opacity="0.04">
+    <!-- 5 rows x 10 cols of subtle dots -->
+    <circle cx="96" cy="108" r="1.5" fill="#fafafa"/>
+    <circle cx="192" cy="108" r="1.5" fill="#fafafa"/>
+    <circle cx="288" cy="108" r="1.5" fill="#fafafa"/>
+    <circle cx="384" cy="108" r="1.5" fill="#fafafa"/>
+    <circle cx="480" cy="108" r="1.5" fill="#fafafa"/>
+    <circle cx="576" cy="108" r="1.5" fill="#fafafa"/>
+    <circle cx="672" cy="108" r="1.5" fill="#fafafa"/>
+    <circle cx="768" cy="108" r="1.5" fill="#fafafa"/>
+    <circle cx="864" cy="108" r="1.5" fill="#fafafa"/>
+
+    <circle cx="96" cy="216" r="1.5" fill="#fafafa"/>
+    <circle cx="192" cy="216" r="1.5" fill="#fafafa"/>
+    <circle cx="288" cy="216" r="1.5" fill="#fafafa"/>
+    <circle cx="384" cy="216" r="1.5" fill="#fafafa"/>
+    <circle cx="480" cy="216" r="1.5" fill="#fafafa"/>
+    <circle cx="576" cy="216" r="1.5" fill="#fafafa"/>
+    <circle cx="672" cy="216" r="1.5" fill="#fafafa"/>
+    <circle cx="768" cy="216" r="1.5" fill="#fafafa"/>
+    <circle cx="864" cy="216" r="1.5" fill="#fafafa"/>
+
+    <circle cx="96" cy="324" r="1.5" fill="#fafafa"/>
+    <circle cx="192" cy="324" r="1.5" fill="#fafafa"/>
+    <circle cx="288" cy="324" r="1.5" fill="#fafafa"/>
+    <circle cx="384" cy="324" r="1.5" fill="#fafafa"/>
+    <circle cx="480" cy="324" r="1.5" fill="#fafafa"/>
+    <circle cx="576" cy="324" r="1.5" fill="#fafafa"/>
+    <circle cx="672" cy="324" r="1.5" fill="#fafafa"/>
+    <circle cx="768" cy="324" r="1.5" fill="#fafafa"/>
+    <circle cx="864" cy="324" r="1.5" fill="#fafafa"/>
+
+    <circle cx="96" cy="432" r="1.5" fill="#fafafa"/>
+    <circle cx="192" cy="432" r="1.5" fill="#fafafa"/>
+    <circle cx="288" cy="432" r="1.5" fill="#fafafa"/>
+    <circle cx="384" cy="432" r="1.5" fill="#fafafa"/>
+    <circle cx="480" cy="432" r="1.5" fill="#fafafa"/>
+    <circle cx="576" cy="432" r="1.5" fill="#fafafa"/>
+    <circle cx="672" cy="432" r="1.5" fill="#fafafa"/>
+    <circle cx="768" cy="432" r="1.5" fill="#fafafa"/>
+    <circle cx="864" cy="432" r="1.5" fill="#fafafa"/>
+  </g>
+
+  <!-- ====== UPTREND CHART (spans full width, behind everything) ====== -->
+  <!-- Fill area under the chart line -->
+  <path
+    d="M0,440 L120,410 240,420 360,370 480,340 600,290 720,240 840,180 960,120 L960,540 L0,540 Z"
+    fill="url(#chartFill)"
+  />
+
+  <!-- Main chart line -->
+  <polyline
+    points="0,440 120,410 240,420 360,370 480,340 600,290 720,240 840,180 960,120"
+    fill="none"
+    stroke="url(#chartGrad)"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#lineGlow)"
+  />
+
+  <!-- Glowing dot at chart peak (right side) -->
+  <circle cx="960" cy="120" r="6" fill="#00c805" filter="url(#arrowGlow)"/>
+  <circle cx="960" cy="120" r="3" fill="#fafafa"/>
+
+  <!-- ====== LEFT SIDE: BRAND TEXT ====== -->
+
+  <!-- "AVERAGE JOE" small label -->
+  <text x="80" y="210" text-anchor="start"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+        font-size="18" font-weight="500" letter-spacing="6"
+        fill="#737373">AVERAGE JOE</text>
+
+  <!-- "TRADES" large heading -->
+  <text x="76" y="290" text-anchor="start"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+        font-size="86" font-weight="800" letter-spacing="-2"
+        fill="#fafafa">TRADES</text>
+
+  <!-- Brand gradient accent bar -->
+  <rect x="80" y="308" width="300" height="4" rx="2" fill="url(#brandGrad)" opacity="0.8"/>
+
+  <!-- Tagline -->
+  <text x="80" y="350" text-anchor="start"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+        font-size="16" font-weight="400" letter-spacing="0.5"
+        fill="#a3a3a3">Your AI-Powered Trading Journal</text>
+
+  <!-- Feature pills -->
+  <g>
+    <!-- Pill 1: Options -->
+    <rect x="80" y="380" width="80" height="28" rx="14" fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="120" y="399" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+          font-size="11" font-weight="600"
+          fill="#34d399">Options</text>
+
+    <!-- Pill 2: Stocks -->
+    <rect x="172" y="380" width="72" height="28" rx="14" fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="208" y="399" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+          font-size="11" font-weight="600"
+          fill="#34d399">Stocks</text>
+
+    <!-- Pill 3: AI -->
+    <rect x="256" y="380" width="50" height="28" rx="14" fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="281" y="399" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+          font-size="11" font-weight="600"
+          fill="#34d399">AI</text>
+
+    <!-- Pill 4: P&L -->
+    <rect x="318" y="380" width="56" height="28" rx="14" fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
+    <text x="346" y="399" text-anchor="middle"
+          font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+          font-size="11" font-weight="600"
+          fill="#34d399">P&amp;L</text>
+  </g>
+
+  <!-- ====== RIGHT SIDE: DECORATIVE CHART CANDLES ====== -->
+  <!-- Simplified candlestick silhouettes for visual texture -->
+  <g opacity="0.15">
+    <!-- Candle 1 (green, bullish) -->
+    <line x1="620" y1="200" x2="620" y2="310" stroke="#00c805" stroke-width="1.5"/>
+    <rect x="612" y="230" width="16" height="40" rx="2" fill="#00c805"/>
+
+    <!-- Candle 2 (red, bearish) -->
+    <line x1="660" y1="210" x2="660" y2="320" stroke="#ff5000" stroke-width="1.5"/>
+    <rect x="652" y="220" width="16" height="50" rx="2" fill="#ff5000"/>
+
+    <!-- Candle 3 (green) -->
+    <line x1="700" y1="180" x2="700" y2="290" stroke="#00c805" stroke-width="1.5"/>
+    <rect x="692" y="200" width="16" height="50" rx="2" fill="#00c805"/>
+
+    <!-- Candle 4 (green) -->
+    <line x1="740" y1="160" x2="740" y2="270" stroke="#00c805" stroke-width="1.5"/>
+    <rect x="732" y="170" width="16" height="60" rx="2" fill="#00c805"/>
+
+    <!-- Candle 5 (red) -->
+    <line x1="780" y1="175" x2="780" y2="260" stroke="#ff5000" stroke-width="1.5"/>
+    <rect x="772" y="185" width="16" height="35" rx="2" fill="#ff5000"/>
+
+    <!-- Candle 6 (green, strong) -->
+    <line x1="820" y1="140" x2="820" y2="250" stroke="#00c805" stroke-width="1.5"/>
+    <rect x="812" y="150" width="16" height="60" rx="2" fill="#00c805"/>
+
+    <!-- Candle 7 (green) -->
+    <line x1="860" y1="120" x2="860" y2="220" stroke="#00c805" stroke-width="1.5"/>
+    <rect x="852" y="130" width="16" height="50" rx="2" fill="#00c805"/>
+  </g>
+
+  <!-- ====== BOTTOM RIGHT: URL ====== -->
+  <text x="880" y="500" text-anchor="end"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+        font-size="13" font-weight="400" letter-spacing="0.5"
+        fill="#525252">self-hosted trading journal</text>
+</svg>

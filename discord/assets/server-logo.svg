@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Brand gradient: emerald → teal -->
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+
+    <!-- Uptrend fill gradient -->
+    <linearGradient id="trendFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00c805" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#00c805" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Uptrend line gradient -->
+    <linearGradient id="trendLine" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00c805" stop-opacity="0.15"/>
+      <stop offset="40%" stop-color="#00c805" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#00c805"/>
+    </linearGradient>
+
+    <!-- Center glow -->
+    <radialGradient id="glow" cx="50%" cy="42%" r="38%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Chart glow filter -->
+    <filter id="lineGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Dot glow -->
+    <filter id="dotGlow">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#09090b"/>
+
+  <!-- Circle-safe inner ring -->
+  <circle cx="256" cy="256" r="248" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+
+  <!-- Ambient glow -->
+  <circle cx="256" cy="220" r="200" fill="url(#glow)"/>
+
+  <!-- Grid dots (trading terminal feel) -->
+  <g opacity="0.05">
+    <circle cx="128" cy="176" r="1.5" fill="#fafafa"/>
+    <circle cx="192" cy="176" r="1.5" fill="#fafafa"/>
+    <circle cx="256" cy="176" r="1.5" fill="#fafafa"/>
+    <circle cx="320" cy="176" r="1.5" fill="#fafafa"/>
+    <circle cx="384" cy="176" r="1.5" fill="#fafafa"/>
+    <circle cx="128" cy="240" r="1.5" fill="#fafafa"/>
+    <circle cx="192" cy="240" r="1.5" fill="#fafafa"/>
+    <circle cx="256" cy="240" r="1.5" fill="#fafafa"/>
+    <circle cx="320" cy="240" r="1.5" fill="#fafafa"/>
+    <circle cx="384" cy="240" r="1.5" fill="#fafafa"/>
+    <circle cx="128" cy="304" r="1.5" fill="#fafafa"/>
+    <circle cx="192" cy="304" r="1.5" fill="#fafafa"/>
+    <circle cx="256" cy="304" r="1.5" fill="#fafafa"/>
+    <circle cx="320" cy="304" r="1.5" fill="#fafafa"/>
+    <circle cx="384" cy="304" r="1.5" fill="#fafafa"/>
+  </g>
+
+  <!-- Uptrend fill area -->
+  <path
+    d="M80,340 L150,300 220,310 280,250 340,210 400,140 L400,380 L80,380 Z"
+    fill="url(#trendFill)"
+  />
+
+  <!-- Uptrend chart line -->
+  <polyline
+    points="80,340 150,300 220,310 280,250 340,210 400,140"
+    fill="none"
+    stroke="url(#trendLine)"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#lineGlow)"
+  />
+
+  <!-- Glowing dot at peak -->
+  <circle cx="400" cy="140" r="7" fill="#00c805" filter="url(#dotGlow)"/>
+  <circle cx="400" cy="140" r="3" fill="#fafafa"/>
+
+  <!-- "AVERAGE JOE" small label -->
+  <text x="256" y="200" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+        font-size="22" font-weight="500" letter-spacing="6"
+        fill="#737373">AVERAGE JOE</text>
+
+  <!-- "TRADES" bold text -->
+  <text x="256" y="280" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+        font-size="100" font-weight="800" letter-spacing="-2"
+        fill="#fafafa">TRADES</text>
+
+  <!-- Brand gradient accent bar -->
+  <rect x="128" y="298" width="256" height="4" rx="2" fill="url(#brandGrad)" opacity="0.8"/>
+
+  <!-- Tagline -->
+  <text x="256" y="340" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+        font-size="14" font-weight="400" letter-spacing="3"
+        fill="#525252">AI-POWERED JOURNAL</text>
+</svg>

@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Brand gradient: emerald → teal (matches hero/CTA) -->
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+
+    <!-- Uptrend line gradient -->
+    <linearGradient id="chartGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00c805" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#00c805"/>
+    </linearGradient>
+
+    <!-- Green ambient glow behind text -->
+    <radialGradient id="centerGlow" cx="50%" cy="45%" r="40%">
+      <stop offset="0%" stop-color="#00c805" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#00c805" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Chart line glow -->
+    <filter id="lineGlow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Soft outer shadow for depth -->
+    <filter id="outerShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="12" flood-color="#00c805" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- ====== BACKGROUND (circle-safe: content centered for Discord crop) ====== -->
+  <rect width="512" height="512" rx="96" fill="#09090b"/>
+
+  <!-- Subtle inner ring (visible when Discord crops to circle) -->
+  <circle cx="256" cy="256" r="248" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+
+  <!-- Ambient green glow -->
+  <circle cx="256" cy="230" r="200" fill="url(#centerGlow)"/>
+
+  <!-- ====== UPTREND CHART LINE (signature element) ====== -->
+  <!-- Bold uptrend line sweeping across — the core trading visual -->
+  <polyline
+    points="80,340 160,310 220,320 280,260 340,230 400,160"
+    fill="none"
+    stroke="url(#chartGrad)"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#lineGlow)"
+  />
+
+  <!-- Trend arrow tip -->
+  <polygon
+    points="400,160 388,180 408,178"
+    fill="#00c805"
+    filter="url(#lineGlow)"
+  />
+
+  <!-- Subtle grid dots (trading screen feel, not distracting) -->
+  <g opacity="0.06">
+    <circle cx="128" cy="192" r="2" fill="#fafafa"/>
+    <circle cx="192" cy="192" r="2" fill="#fafafa"/>
+    <circle cx="256" cy="192" r="2" fill="#fafafa"/>
+    <circle cx="320" cy="192" r="2" fill="#fafafa"/>
+    <circle cx="384" cy="192" r="2" fill="#fafafa"/>
+    <circle cx="128" cy="256" r="2" fill="#fafafa"/>
+    <circle cx="192" cy="256" r="2" fill="#fafafa"/>
+    <circle cx="256" cy="256" r="2" fill="#fafafa"/>
+    <circle cx="320" cy="256" r="2" fill="#fafafa"/>
+    <circle cx="384" cy="256" r="2" fill="#fafafa"/>
+    <circle cx="128" cy="320" r="2" fill="#fafafa"/>
+    <circle cx="192" cy="320" r="2" fill="#fafafa"/>
+    <circle cx="256" cy="320" r="2" fill="#fafafa"/>
+    <circle cx="320" cy="320" r="2" fill="#fafafa"/>
+    <circle cx="384" cy="320" r="2" fill="#fafafa"/>
+  </g>
+
+  <!-- ====== "AJ" MONOGRAM (large, bold, unmistakable at 32px) ====== -->
+  <text x="256" y="290" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+        font-size="160" font-weight="800" letter-spacing="-4"
+        fill="#fafafa">AJ</text>
+
+  <!-- Green accent bar under text (brand signature) -->
+  <rect x="156" y="310" width="200" height="4" rx="2" fill="url(#brandGrad)" opacity="0.8"/>
+
+  <!-- ====== "TRADES" SUBTITLE ====== -->
+  <text x="256" y="370" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, sans-serif"
+        font-size="28" font-weight="600" letter-spacing="12"
+        fill="#737373">TRADES</text>
+</svg>
