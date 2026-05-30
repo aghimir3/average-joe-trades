@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Average Joe Trades: Self-Hostable Trading Journal for Stocks &amp; Options</title>
+  <meta name="description" content="Average Joe Trades is an open-source, self-hostable trading journal for stocks and options. Ledger-first accounting, FIFO P&L, broker import/sync, options strategy dashboards, AI insights, and read-only MCP access for your personal agents." />
+  <meta name="author" content="Average Joe Trades contributors" />
+  <meta name="theme-color" content="#0a1330" />
+
+  <!-- Open Graph / Social -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Average Joe Trades: Self-Hostable Trading Journal" />
+  <meta property="og:description" content="Ledger-first trading journal for stocks & options. Broker sync, FIFO P&L, options analytics, AI insights, and read-only MCP, open source and self-hostable." />
+  <meta property="og:image" content="public/social/average-joe-preview.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Average Joe Trades: Self-Hostable Trading Journal" />
+  <meta name="twitter:description" content="Ledger-first trading journal for stocks & options. Open source and self-hostable." />
+  <meta name="twitter:image" content="public/social/average-joe-preview.png" />
+
+  <link rel="icon" type="image/svg+xml" href="public/icons/icon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="public/icons/favicon-32x32.png" />
+  <link rel="apple-touch-icon" href="public/icons/apple-touch-icon.png" />
+
+  <!-- Tailwind Play CDN -->
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: {
+              950: '#070d22',
+              900: '#0a1330',
+              800: '#0f1c44',
+              700: '#16275d',
+            },
+            brand: {
+              DEFAULT: '#00c805',
+              hover: '#00e006',
+              dark: '#009904',
+            },
+            ocean: '#2a6df5',
+            teal: '#17a2a2',
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+          },
+          keyframes: {
+            float: {
+              '0%,100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-14px)' },
+            },
+            shimmer: {
+              '0%': { backgroundPosition: '-1000px 0' },
+              '100%': { backgroundPosition: '1000px 0' },
+            },
+          },
+          animation: {
+            float: 'float 7s ease-in-out infinite',
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    :root { color-scheme: dark; }
+    html, body { background-color: #070d22; }
+
+    /* Animated aurora background */
+    .aurora {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .aurora::before,
+    .aurora::after {
+      content: '';
+      position: absolute;
+      width: 60vmax;
+      height: 60vmax;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.45;
+      will-change: transform;
+    }
+    .aurora::before {
+      background: radial-gradient(circle at center, #0f5a45 0%, transparent 70%);
+      top: -18vmax; left: -12vmax;
+      animation: drift1 22s ease-in-out infinite alternate;
+    }
+    .aurora::after {
+      background: radial-gradient(circle at center, #1b3a8f 0%, transparent 70%);
+      bottom: -20vmax; right: -14vmax;
+      animation: drift2 26s ease-in-out infinite alternate;
+    }
+    @keyframes drift1 {
+      from { transform: translate(0,0) scale(1); }
+      to   { transform: translate(14vmax, 10vmax) scale(1.15); }
+    }
+    @keyframes drift2 {
+      from { transform: translate(0,0) scale(1.1); }
+      to   { transform: translate(-12vmax, -8vmax) scale(1); }
+    }
+
+    /* Subtle grid overlay */
+    .grid-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+    }
+
+    .gradient-text {
+      background: linear-gradient(120deg, #fff 0%, #9fe8b0 45%, #00c805 70%, #4f9cff 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .glass {
+      background: rgba(15, 28, 68, 0.45);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .card-glow {
+      transition: transform .35s cubic-bezier(.2,.7,.2,1), border-color .35s, box-shadow .35s;
+    }
+    .card-glow:hover {
+      transform: translateY(-6px);
+      border-color: rgba(0, 200, 5, 0.4);
+      box-shadow: 0 18px 50px -20px rgba(0, 200, 5, 0.35);
+    }
+
+    /* Reveal on scroll */
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1);
+    }
+    .reveal.in {
+      opacity: 1;
+      transform: none;
+    }
+
+    .ticker-mask {
+      mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    }
+    .ticker-track {
+      display: inline-flex;
+      gap: 3rem;
+      animation: ticker 28s linear infinite;
+    }
+    @keyframes ticker {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    /* Faux dashboard bars */
+    .bar { transition: height 1.1s cubic-bezier(.2,.7,.2,1); }
+
+    ::selection { background: rgba(0,200,5,0.3); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .aurora::before, .aurora::after, .ticker-track { animation: none; }
+      .reveal { opacity: 1; transform: none; transition: none; }
+    }
+  </style>
+</head>
+
+<body class="font-sans text-slate-200 antialiased selection:text-white">
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grid-overlay" aria-hidden="true"></div>
+
+  <!-- NAV -->
+  <header id="nav" class="fixed top-0 inset-x-0 z-50 transition-all duration-300">
+    <nav class="mx-auto max-w-7xl px-5 sm:px-8">
+      <div class="mt-3 flex items-center justify-between rounded-2xl glass px-4 py-3 sm:px-6">
+        <a href="#top" class="flex items-center gap-2.5 group">
+          <span class="relative inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-emerald-600 shadow-lg shadow-brand/30">
+            <svg viewBox="0 0 24 24" class="h-5 w-5 text-ink-950" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 17l5-5 4 4 8-8" />
+              <path d="M16 8h4v4" />
+            </svg>
+          </span>
+          <span class="font-bold tracking-tight text-white">Average&nbsp;Joe&nbsp;Trades</span>
+        </a>
+
+        <div class="hidden items-center gap-7 md:flex text-sm font-medium text-slate-300">
+          <a href="#features" class="hover:text-white transition-colors">Features</a>
+          <a href="#how" class="hover:text-white transition-colors">How it works</a>
+          <a href="#ai" class="hover:text-white transition-colors">AI &amp; agents</a>
+          <a href="#deploy" class="hover:text-white transition-colors">Self-host</a>
+          <a href="#stack" class="hover:text-white transition-colors">Tech</a>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <a href="https://www.averagejoetrades.com/" target="_blank" rel="noopener"
+             class="hidden lg:inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-emerald-300 hover:text-emerald-200 transition-colors">
+            Live app
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </a>
+          <a href="https://github.com/aghimir3/average-joe-trades" target="_blank" rel="noopener"
+             class="hidden sm:inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors">
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
+            Star on GitHub
+          </a>
+          <button id="menuBtn" class="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white" aria-label="Toggle menu" aria-expanded="false">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile menu -->
+      <div id="mobileMenu" class="md:hidden hidden mt-2 rounded-2xl glass p-2 text-sm font-medium">
+        <a href="#features" class="block rounded-lg px-4 py-3 text-slate-200 hover:bg-white/5">Features</a>
+        <a href="#how" class="block rounded-lg px-4 py-3 text-slate-200 hover:bg-white/5">How it works</a>
+        <a href="#ai" class="block rounded-lg px-4 py-3 text-slate-200 hover:bg-white/5">AI &amp; agents</a>
+        <a href="#deploy" class="block rounded-lg px-4 py-3 text-slate-200 hover:bg-white/5">Self-host</a>
+        <a href="#stack" class="block rounded-lg px-4 py-3 text-slate-200 hover:bg-white/5">Tech</a>
+        <a href="https://www.averagejoetrades.com/" target="_blank" rel="noopener" class="mt-1 block rounded-lg border border-white/10 px-4 py-3 text-center font-semibold text-emerald-300 hover:bg-white/5">Try the live app ↗</a>
+        <a href="https://github.com/aghimir3/average-joe-trades" target="_blank" rel="noopener" class="mt-1 block rounded-lg bg-brand px-4 py-3 text-center font-semibold text-ink-950">View on GitHub</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="relative px-5 pt-36 pb-20 sm:px-8 sm:pt-44">
+      <div class="mx-auto max-w-7xl">
+        <div class="grid items-center gap-14 lg:grid-cols-12">
+          <!-- Left -->
+          <div class="lg:col-span-6">
+            <div class="reveal inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3.5 py-1.5 text-xs font-semibold text-emerald-300">
+              <span class="relative flex h-2 w-2">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-70"></span>
+                <span class="relative inline-flex h-2 w-2 rounded-full bg-brand"></span>
+              </span>
+              AI-native &amp; self-hostable
+            </div>
+
+            <h1 class="reveal mt-6 text-4xl font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl">
+              The trading journal with<br class="hidden sm:block" />
+              <span class="gradient-text">a brain of its own.</span>
+            </h1>
+
+            <p class="reveal mt-6 max-w-xl text-lg leading-relaxed text-slate-300">
+              <strong class="text-white">Average Joe Trades</strong> is a ledger-first journal for stocks and options with
+              a real intelligence layer: a tool-calling <strong class="text-white">Ask&nbsp;Joey</strong> agent,
+              on-device <strong class="text-white">ML models</strong>, and an agent-ready
+              <strong class="text-white">read-only MCP</strong> endpoint, all on infrastructure you control.
+            </p>
+
+            <div class="reveal mt-8 flex flex-wrap items-center gap-3">
+              <a href="https://github.com/aghimir3/average-joe-trades" target="_blank" rel="noopener"
+                 class="group inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3.5 font-semibold text-ink-950 shadow-lg shadow-brand/30 transition-all hover:bg-brand-hover hover:shadow-brand/50">
+                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
+                Get the code
+              </a>
+              <a href="https://www.averagejoetrades.com/" target="_blank" rel="noopener"
+                 class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3.5 font-semibold text-white transition-colors hover:bg-white/10">
+                Try the live app
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
+              </a>
+            </div>
+
+            <p class="reveal mt-4 text-sm text-slate-400">
+              Free &amp; open source under your control, or
+              <a href="https://www.averagejoetrades.com/" target="_blank" rel="noopener" class="font-medium text-emerald-300 underline-offset-2 hover:underline">kick the tires on the hosted demo</a>
+              before you self-host.
+            </p>
+
+            <!-- Stats -->
+            <dl class="reveal mt-12 grid max-w-lg grid-cols-3 gap-6">
+              <div>
+                <dt class="text-3xl font-extrabold text-white"><span data-count="8" data-suffix="+">0</span></dt>
+                <dd class="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">On-device ML models</dd>
+              </div>
+              <div>
+                <dt class="text-3xl font-extrabold text-white"><span data-count="15" data-suffix="+">0</span></dt>
+                <dd class="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">Read-only MCP tools</dd>
+              </div>
+              <div>
+                <dt class="text-3xl font-extrabold text-white"><span data-count="100" data-suffix="%">0</span></dt>
+                <dd class="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">Self-hosted &amp; private</dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- Right: faux dashboard -->
+          <div class="reveal lg:col-span-6">
+            <div class="relative animate-float">
+              <div class="absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-tr from-brand/20 via-ocean/10 to-transparent blur-2xl"></div>
+              <div class="glass rounded-3xl p-5 shadow-2xl shadow-black/40">
+                <!-- window chrome -->
+                <div class="flex items-center gap-2 px-1 pb-4">
+                  <span class="h-3 w-3 rounded-full bg-red-400/80"></span>
+                  <span class="h-3 w-3 rounded-full bg-amber-400/80"></span>
+                  <span class="h-3 w-3 rounded-full bg-emerald-400/80"></span>
+                  <span class="ml-3 text-xs font-medium text-slate-400">Portfolio · Performance</span>
+                </div>
+
+                <!-- equity stat -->
+                <div class="rounded-2xl bg-ink-950/60 p-5">
+                  <div class="flex items-end justify-between">
+                    <div>
+                      <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Realized P&amp;L (YTD)</p>
+                      <p class="mt-1 text-3xl font-extrabold text-white">+$24,318<span class="text-base font-semibold text-emerald-400">.42</span></p>
+                    </div>
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-brand/15 px-2.5 py-1 text-xs font-bold text-emerald-300">
+                      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17l9-9M9 8h7v7"/></svg>
+                      +18.6%
+                    </span>
+                  </div>
+
+                  <!-- bars -->
+                  <div id="chart" class="mt-6 flex h-28 items-end gap-1.5">
+                    <!-- bars injected by JS -->
+                  </div>
+                </div>
+
+                <!-- positions -->
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                  <div class="rounded-2xl bg-ink-950/60 p-4">
+                    <p class="text-xs font-medium text-slate-400">Wheel: AAPL</p>
+                    <p class="mt-1 font-bold text-white">CSP · 30d</p>
+                    <p class="mt-2 text-sm font-semibold text-emerald-400">+$412 premium</p>
+                  </div>
+                  <div class="rounded-2xl bg-ink-950/60 p-4">
+                    <p class="text-xs font-medium text-slate-400">Open positions</p>
+                    <p class="mt-1 font-bold text-white">12 active</p>
+                    <p class="mt-2 text-sm font-semibold text-ocean">7 options · 5 equity</p>
+                  </div>
+                </div>
+
+                <!-- AI insight -->
+                <div class="mt-4 flex items-start gap-3 rounded-2xl border border-brand/20 bg-brand/5 p-4">
+                  <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand/20 text-emerald-300">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>
+                  </span>
+                  <p class="text-sm leading-relaxed text-slate-300"><span class="font-semibold text-white">Ask Joey:</span> Your realized gains are concentrated in 2 tickers. Consider reviewing position sizing before next earnings.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TICKER / TRUST -->
+    <section class="border-y border-white/5 bg-ink-950/40 py-6">
+      <div class="ticker-mask overflow-hidden">
+        <div class="ticker-track whitespace-nowrap text-sm font-semibold text-slate-400">
+          <div class="ticker-set inline-flex items-center gap-12">
+            <span>Ledger-first accounting</span><span class="text-brand">◆</span>
+            <span>FIFO-derived P&amp;L</span><span class="text-ocean">◆</span>
+            <span>Broker import &amp; sync</span><span class="text-teal">◆</span>
+            <span>Options analytics</span><span class="text-brand">◆</span>
+            <span>Wheel strategy</span><span class="text-ocean">◆</span>
+            <span>AI insights</span><span class="text-teal">◆</span>
+            <span>Read-only MCP</span><span class="text-brand">◆</span>
+            <span>Self-hostable</span><span class="text-ocean">◆</span>
+          </div>
+          <div class="ticker-set inline-flex items-center gap-12" aria-hidden="true">
+            <span>Ledger-first accounting</span><span class="text-brand">◆</span>
+            <span>FIFO-derived P&amp;L</span><span class="text-ocean">◆</span>
+            <span>Broker import &amp; sync</span><span class="text-teal">◆</span>
+            <span>Options analytics</span><span class="text-brand">◆</span>
+            <span>Wheel strategy</span><span class="text-ocean">◆</span>
+            <span>AI insights</span><span class="text-teal">◆</span>
+            <span>Read-only MCP</span><span class="text-brand">◆</span>
+            <span>Self-hostable</span><span class="text-ocean">◆</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section id="features" class="px-5 py-24 sm:px-8">
+      <div class="mx-auto max-w-7xl">
+        <div class="reveal mx-auto max-w-2xl text-center">
+          <p class="text-sm font-semibold uppercase tracking-widest text-brand">Everything in one place</p>
+          <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Built for traders who want the receipts</h2>
+          <p class="mt-4 text-lg text-slate-300">A complete picture of your trading, derived from an immutable event log you fully control.</p>
+        </div>
+
+        <div class="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <!-- card -->
+          <article class="reveal card-glow rounded-2xl glass p-6">
+            <div class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand/15 text-emerald-300">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v4H4zM4 12h16v8H4zM8 12v8M16 12v8"/></svg>
+            </div>
+            <h3 class="mt-5 text-lg font-bold text-white">Immutable ledger</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">Every fill is an event. Positions, realized closes, and daily aggregates are all derived, so your history is auditable and reproducible.</p>
+          </article>
+
+          <article class="reveal card-glow rounded-2xl glass p-6">
+            <div class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-ocean/15 text-blue-300">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M7 7l10 10M17 7L7 17"/></svg>
+            </div>
+            <h3 class="mt-5 text-lg font-bold text-white">FIFO-derived P&amp;L</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">Realized profit and loss computed with first-in-first-out matching across equities and options, consistent and explainable.</p>
+          </article>
+
+          <article class="reveal card-glow rounded-2xl glass p-6">
+            <div class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-teal/15 text-teal-200">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+            </div>
+            <h3 class="mt-5 text-lg font-bold text-white">Import &amp; broker sync</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">Bring trades in via CSV/JSON, or connect a brokerage with optional SnapTrade sync to keep your journal current.</p>
+          </article>
+
+          <article class="reveal card-glow rounded-2xl glass p-6">
+            <div class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand/15 text-emerald-300">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <h3 class="mt-5 text-lg font-bold text-white">Options &amp; wheel</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">Dashboards for options analytics and the wheel strategy that track premium, assignments, and outcomes over time.</p>
+          </article>
+
+          <article class="reveal card-glow rounded-2xl glass p-6">
+            <div class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-ocean/15 text-blue-300">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-6"/></svg>
+            </div>
+            <h3 class="mt-5 text-lg font-bold text-white">Performance &amp; charts</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">Performance dashboards, position views, a trade journal, and charts powered by Chart.js and Lightweight Charts.</p>
+          </article>
+
+          <article class="reveal card-glow rounded-2xl glass p-6">
+            <div class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-teal/15 text-teal-200">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h3 class="mt-5 text-lg font-bold text-white">Private by design</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">Self-host on your own database and domain. Your trades, accounts, and keys stay on infrastructure you operate.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section id="how" class="px-5 py-24 sm:px-8">
+      <div class="mx-auto max-w-7xl">
+        <div class="reveal mx-auto max-w-2xl text-center">
+          <p class="text-sm font-semibold uppercase tracking-widest text-brand">From fills to insight</p>
+          <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">How it works</h2>
+        </div>
+
+        <div class="mt-16 grid gap-6 md:grid-cols-3">
+          <div class="reveal relative rounded-2xl glass p-7">
+            <span class="font-mono text-5xl font-extrabold text-white/10">01</span>
+            <h3 class="mt-2 text-lg font-bold text-white">Bring your trades in</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">Import CSV/JSON exports or connect a broker. Each trade becomes an immutable ledger event.</p>
+          </div>
+          <div class="reveal relative rounded-2xl glass p-7">
+            <span class="font-mono text-5xl font-extrabold text-white/10">02</span>
+            <h3 class="mt-2 text-lg font-bold text-white">Positions derive themselves</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">FIFO matching produces realized closes, open positions, and daily aggregates, automatically and reproducibly.</p>
+          </div>
+          <div class="reveal relative rounded-2xl glass p-7">
+            <span class="font-mono text-5xl font-extrabold text-white/10">03</span>
+            <h3 class="mt-2 text-lg font-bold text-white">Ask, predict &amp; automate</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">Chat with Ask Joey, get ML-backed AI insights, or let your own agents query the read-only MCP endpoint.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI CENTERPIECE -->
+    <section id="ai" class="relative px-5 py-28 sm:px-8">
+      <div class="absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-brand/[0.04] to-transparent"></div>
+      <div class="mx-auto max-w-7xl">
+        <div class="reveal mx-auto max-w-2xl text-center">
+          <p class="text-sm font-semibold uppercase tracking-widest text-brand">The intelligence layer</p>
+          <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-5xl">AI that actually reads your trades</h2>
+          <p class="mt-5 text-lg leading-relaxed text-slate-300">
+            Not a chatbot bolted on top. Three layers of intelligence: a tool-calling agent,
+            on-device machine learning, and an agent-ready API, all working from your real, FIFO-derived ledger.
+          </p>
+        </div>
+
+        <!-- Three pillars -->
+        <div class="mt-16 grid gap-5 lg:grid-cols-3">
+          <article class="reveal card-glow rounded-2xl glass p-7">
+            <div class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand/15 text-emerald-300">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M8 8h8M8 16h5"/><path d="M21 11.5a8.5 8.5 0 1 1-3.5-6.9L21 4v7.5z"/></svg>
+            </div>
+            <h3 class="mt-5 text-lg font-bold text-white">Ask Joey</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">A conversational agent that <span class="font-semibold text-white">calls real tools</span>, running scoped queries against your ledger to answer questions with actual numbers, not guesses.</p>
+            <p class="mt-4 text-xs font-medium uppercase tracking-wider text-slate-500">Vercel AI SDK · Anthropic / OpenAI</p>
+          </article>
+
+          <article class="reveal card-glow rounded-2xl glass p-7">
+            <div class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-ocean/15 text-blue-300">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
+            </div>
+            <h3 class="mt-5 text-lg font-bold text-white">On-device AI Insights</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">TensorFlow.js models trained on <span class="font-semibold text-white">your own history</span>: entry timing, exit strategy, risk, position health and more. Models run on your infra, so your data never leaves.</p>
+            <p class="mt-4 text-xs font-medium uppercase tracking-wider text-slate-500">TensorFlow.js · runs locally</p>
+          </article>
+
+          <article class="reveal card-glow rounded-2xl glass p-7">
+            <div class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-teal/15 text-teal-200">
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.6 10.5l6.8-3M8.6 13.5l6.8 3"/></svg>
+            </div>
+            <h3 class="mt-5 text-lg font-bold text-white">Agent-ready MCP</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-300">A <span class="font-semibold text-white">read-only MCP endpoint</span> exposes 15+ scoped tools to your personal agents, protected by per-user API keys, never mutating your ledger.</p>
+            <p class="mt-4 text-xs font-medium uppercase tracking-wider text-slate-500">Model Context Protocol</p>
+          </article>
+        </div>
+
+        <!-- Interactive Ask Joey demo + ML grid -->
+        <div class="mt-8 grid gap-5 lg:grid-cols-2">
+          <!-- Chat demo -->
+          <div class="reveal">
+            <div class="flex h-full flex-col overflow-hidden rounded-2xl glass shadow-2xl shadow-black/40">
+              <div class="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+                <span class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-brand to-emerald-600 text-ink-950">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8"/><path d="M16 8h4v4"/></svg>
+                </span>
+                <span class="font-semibold text-white">Ask Joey</span>
+                <span class="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
+                  <span class="h-1.5 w-1.5 rounded-full bg-brand"></span> tool-calling
+                </span>
+              </div>
+              <div id="chatBody" class="flex-1 space-y-3 p-4 text-sm" style="min-height: 320px"></div>
+            </div>
+          </div>
+
+          <!-- ML models grid -->
+          <div class="reveal">
+            <div class="h-full rounded-2xl glass p-6">
+              <h3 class="flex items-center gap-2 font-bold text-white">
+                <svg class="h-5 w-5 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 0-4 4 4 4 0 0 0-2 7 4 4 0 0 0 2 7 4 4 0 0 0 8 0 4 4 0 0 0 2-7 4 4 0 0 0-2-7 4 4 0 0 0-4-4z"/><path d="M12 6v12"/></svg>
+                Models that ship in the box
+              </h3>
+              <p class="mt-2 text-sm text-slate-400">Purpose-built TensorFlow.js models for equities, options, and the wheel.</p>
+              <div class="mt-5 grid grid-cols-2 gap-2.5 text-sm">
+                <div class="rounded-xl bg-ink-950/60 px-3.5 py-3 font-medium text-slate-200">⚡ Entry timing</div>
+                <div class="rounded-xl bg-ink-950/60 px-3.5 py-3 font-medium text-slate-200">🚪 Exit strategy</div>
+                <div class="rounded-xl bg-ink-950/60 px-3.5 py-3 font-medium text-slate-200">🩺 Position health</div>
+                <div class="rounded-xl bg-ink-950/60 px-3.5 py-3 font-medium text-slate-200">🛡️ Risk analyzer</div>
+                <div class="rounded-xl bg-ink-950/60 px-3.5 py-3 font-medium text-slate-200">🏷️ Strategy classifier</div>
+                <div class="rounded-xl bg-ink-950/60 px-3.5 py-3 font-medium text-slate-200">🌊 Volatility regime</div>
+                <div class="rounded-xl bg-ink-950/60 px-3.5 py-3 font-medium text-slate-200">🔗 Trade similarity</div>
+                <div class="rounded-xl bg-ink-950/60 px-3.5 py-3 font-medium text-slate-200">🧮 Ensemble predictor</div>
+              </div>
+              <div class="mt-5 flex items-start gap-3 rounded-xl border border-ocean/20 bg-ocean/5 p-4">
+                <svg class="mt-0.5 h-5 w-5 shrink-0 text-blue-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <p class="text-sm leading-relaxed text-slate-300"><span class="font-semibold text-white">Trained &amp; served locally.</span> Your trade data is never sent to a third-party training service.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MCP tools + code -->
+        <div class="mt-8 grid items-stretch gap-5 lg:grid-cols-2">
+          <!-- code window -->
+          <div class="reveal">
+            <div class="h-full overflow-hidden rounded-2xl glass shadow-2xl shadow-black/40">
+              <div class="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+                <span class="h-3 w-3 rounded-full bg-red-400/80"></span>
+                <span class="h-3 w-3 rounded-full bg-amber-400/80"></span>
+                <span class="h-3 w-3 rounded-full bg-emerald-400/80"></span>
+                <span class="ml-2 font-mono text-xs text-slate-400">POST /api/mcp</span>
+              </div>
+              <pre class="overflow-x-auto p-5 font-mono text-[13px] leading-relaxed text-slate-300"><code><span class="text-slate-500"># Point your own agent at your journal</span>
+<span class="text-blue-300">curl</span> https://your-domain/api/mcp \
+  -H <span class="text-emerald-300">"Authorization: Bearer ajt_••••••••"</span> \
+  -H <span class="text-emerald-300">"Content-Type: application/json"</span> \
+  -d <span class="text-emerald-300">'{
+    "method": "tools/call",
+    "params": {
+      "name": "get_ticker_recommendation",
+      "arguments": { "symbol": "AAPL" }
+    }
+  }'</span>
+
+<span class="text-slate-500"># → scoped, read-only, ML-backed result</span></code></pre>
+            </div>
+          </div>
+
+          <!-- tool chips + guarantees -->
+          <div class="reveal">
+            <div class="h-full rounded-2xl glass p-6">
+              <h3 class="font-bold text-white">A real tool surface</h3>
+              <p class="mt-2 text-sm text-slate-400">The same scoped queries power Ask Joey and the MCP endpoint.</p>
+              <div class="mt-4 flex flex-wrap gap-2 font-mono text-xs">
+                <span class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-emerald-300">get_portfolio_summary</span>
+                <span class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-emerald-300">get_performance</span>
+                <span class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-emerald-300">get_trade_metrics</span>
+                <span class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-emerald-300">get_positions</span>
+                <span class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-emerald-300">get_ai_actions</span>
+                <span class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-emerald-300">get_ticker_recommendation</span>
+                <span class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-emerald-300">get_market_regimes</span>
+                <span class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-emerald-300">get_journal_entries</span>
+                <span class="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-slate-400">+ more</span>
+              </div>
+              <ul class="mt-6 space-y-3 text-sm">
+                <li class="flex items-start gap-3">
+                  <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-brand/15 text-emerald-300"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                  <p class="text-slate-300"><span class="font-semibold text-white">Read-only &amp; user-scoped</span>: agents can read, never write.</p>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-brand/15 text-emerald-300"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                  <p class="text-slate-300"><span class="font-semibold text-white">Keys you control</span>: <code class="rounded bg-white/10 px-1.5 py-0.5 text-emerald-300">ajt_</code> keys are shown once, stored as HMAC-SHA-256 hashes.</p>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-brand/15 text-emerald-300"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                  <p class="text-slate-300"><span class="font-semibold text-white">Bring your own provider</span>: Anthropic or OpenAI via env vars.</p>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEPLOY / SELF-HOST -->
+    <section id="deploy" class="px-5 py-24 sm:px-8">
+      <div class="mx-auto max-w-7xl">
+        <div class="reveal mx-auto max-w-2xl text-center">
+          <p class="text-sm font-semibold uppercase tracking-widest text-brand">Your infra, your rules</p>
+          <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Run it your way</h2>
+          <p class="mt-4 text-lg text-slate-300">From a laptop to the cloud, deploy with Docker, Azure App Service, or AWS.</p>
+        </div>
+
+        <div class="mt-14 grid gap-6 lg:grid-cols-2">
+          <!-- quickstart -->
+          <div class="reveal rounded-2xl glass p-6">
+            <h3 class="flex items-center gap-2 font-bold text-white">
+              <svg class="h-5 w-5 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+              Quick start
+            </h3>
+            <pre class="mt-4 overflow-x-auto rounded-xl bg-ink-950/70 p-4 font-mono text-[13px] leading-relaxed text-slate-300"><code>npm ci
+cp .env.example .env.local
+<span class="text-slate-500"># edit DB, auth & URL values</span>
+npm run db:generate
+npx prisma db push
+npm run dev</code></pre>
+            <p class="mt-3 text-sm text-slate-400">Open <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-emerald-300">http://localhost:3000</code></p>
+          </div>
+
+          <!-- docker -->
+          <div class="reveal rounded-2xl glass p-6">
+            <h3 class="flex items-center gap-2 font-bold text-white">
+              <svg class="h-5 w-5 text-ocean" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="6" height="5"/><path d="M9 9V4h6v5M3 14h18a4 4 0 0 1-4 4H9a6 6 0 0 1-6-4z"/></svg>
+              Docker Compose
+            </h3>
+            <pre class="mt-4 overflow-x-auto rounded-xl bg-ink-950/70 p-4 font-mono text-[13px] leading-relaxed text-slate-300"><code>cp .env.example .env.local
+<span class="text-slate-500"># set secrets & DB password</span>
+docker compose --env-file .env.local \
+  up --build</code></pre>
+            <p class="mt-3 text-sm text-slate-400">Boots the app plus a local SQL Server container.</p>
+          </div>
+        </div>
+
+        <div class="reveal mt-6 grid gap-4 sm:grid-cols-3">
+          <div class="rounded-2xl glass p-5 text-center">
+            <p class="font-bold text-white">Docker</p>
+            <p class="mt-1 text-sm text-slate-400">Containerized app + SQL Server</p>
+          </div>
+          <div class="rounded-2xl glass p-5 text-center">
+            <p class="font-bold text-white">Azure App Service</p>
+            <p class="mt-1 text-sm text-slate-400">Zip deploy workflow template</p>
+          </div>
+          <div class="rounded-2xl glass p-5 text-center">
+            <p class="font-bold text-white">AWS</p>
+            <p class="mt-1 text-sm text-slate-400">ECS / Fargate · App Runner</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TECH STACK -->
+    <section id="stack" class="px-5 py-24 sm:px-8">
+      <div class="mx-auto max-w-7xl">
+        <div class="reveal mx-auto max-w-2xl text-center">
+          <p class="text-sm font-semibold uppercase tracking-widest text-brand">Modern foundation</p>
+          <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Tech stack</h2>
+        </div>
+        <div class="reveal mx-auto mt-12 flex max-w-4xl flex-wrap items-center justify-center gap-3">
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Next.js 16</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">React 19</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">TypeScript</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Prisma 7</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">SQL Server</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Auth.js / NextAuth v5</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Tailwind CSS v4</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Radix UI</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">TanStack Query</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Chart.js</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Lightweight Charts</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">TensorFlow.js</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Vercel AI SDK</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Vitest</span>
+          <span class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200">Playwright</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="px-5 pb-24 sm:px-8">
+      <div class="reveal mx-auto max-w-5xl overflow-hidden rounded-3xl border border-brand/20 bg-gradient-to-br from-ink-800 to-ink-950 p-10 text-center shadow-2xl shadow-black/40 sm:p-16">
+        <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Own your trading record.</h2>
+        <p class="mx-auto mt-4 max-w-xl text-lg text-slate-300">Clone it, self-host it, and make it yours. Average Joe Trades is open source and ready to run, or try the hosted app first.</p>
+        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <a href="https://github.com/aghimir3/average-joe-trades" target="_blank" rel="noopener"
+             class="inline-flex items-center gap-2 rounded-xl bg-brand px-6 py-3.5 font-semibold text-ink-950 shadow-lg shadow-brand/30 transition-all hover:bg-brand-hover hover:shadow-brand/50">
+            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>
+            View the repository
+          </a>
+          <a href="https://www.averagejoetrades.com/" target="_blank" rel="noopener"
+             class="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-3.5 font-semibold text-white transition-colors hover:bg-white/10">
+            Try the live app
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-white/5 px-5 py-12 sm:px-8">
+    <div class="mx-auto max-w-7xl">
+      <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
+        <div class="flex items-center gap-2.5">
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-emerald-600">
+            <svg viewBox="0 0 24 24" class="h-4 w-4 text-ink-950" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8"/><path d="M16 8h4v4"/></svg>
+          </span>
+          <span class="font-bold text-white">Average Joe Trades</span>
+        </div>
+        <div class="flex items-center gap-6 text-sm font-medium text-slate-400">
+          <a href="#features" class="hover:text-white transition-colors">Features</a>
+          <a href="#deploy" class="hover:text-white transition-colors">Self-host</a>
+          <a href="https://www.averagejoetrades.com/" target="_blank" rel="noopener" class="hover:text-white transition-colors">Live app</a>
+          <a href="https://github.com/aghimir3/average-joe-trades" target="_blank" rel="noopener" class="hover:text-white transition-colors">GitHub</a>
+        </div>
+      </div>
+
+      <div class="mt-8 rounded-xl border border-amber-400/15 bg-amber-400/5 p-4">
+        <p class="text-center text-xs leading-relaxed text-amber-200/80">
+          <strong class="text-amber-200">Disclaimer:</strong> Average Joe Trades is decision-support software, not financial advice, brokerage, execution, custody, tax, accounting, or legal service. Nothing here is a recommendation to buy or sell any security.
+        </p>
+      </div>
+
+      <p class="mt-8 text-center text-xs text-slate-500">© <span id="year">2026</span> Average Joe Trades contributors · Open source.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Year
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Nav scroll state
+    const nav = document.getElementById('nav');
+    const onScroll = () => nav.classList.toggle('shadow-2xl', window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    // Mobile menu
+    const menuBtn = document.getElementById('menuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    menuBtn.addEventListener('click', () => {
+      const open = mobileMenu.classList.toggle('hidden') === false;
+      menuBtn.setAttribute('aria-expanded', String(open));
+    });
+    mobileMenu.querySelectorAll('a').forEach(a =>
+      a.addEventListener('click', () => {
+        mobileMenu.classList.add('hidden');
+        menuBtn.setAttribute('aria-expanded', 'false');
+      })
+    );
+
+    // Faux chart bars
+    const chart = document.getElementById('chart');
+    if (chart) {
+      const heights = [38, 52, 30, 64, 48, 72, 58, 80, 66, 90, 76, 100];
+      heights.forEach((h, i) => {
+        const bar = document.createElement('div');
+        const up = i % 3 !== 1;
+        bar.className = 'bar flex-1 rounded-t-sm ' + (up ? 'bg-gradient-to-t from-brand/40 to-brand' : 'bg-gradient-to-t from-ocean/30 to-ocean/70');
+        bar.style.height = '4px';
+        chart.appendChild(bar);
+        requestAnimationFrame(() => setTimeout(() => { bar.style.height = h + '%'; }, 120 + i * 70));
+      });
+    }
+
+    // Scroll reveal
+    const revealEls = document.querySelectorAll('.reveal');
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    revealEls.forEach((el) => io.observe(el));
+
+    // ───────────────────────── Ask Joey demo ─────────────────────────
+    const chatBody = document.getElementById('chatBody');
+    if (chatBody) {
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const script = [
+        { who: 'user', text: 'How did my options trades do this quarter?' },
+        { who: 'tool', text: 'get_performance · get_trade_metrics' },
+        { who: 'joey', text: 'Your options realized +$8,240 across 47 closes this quarter, a 63% win rate and 1.9 profit factor. Most of it came from cash-secured puts on AAPL and MSFT.' },
+        { who: 'user', text: 'What does the model think about AAPL right now?' },
+        { who: 'tool', text: 'get_ticker_recommendation { symbol: "AAPL" }' },
+        { who: 'joey', text: 'The on-device model flags AAPL as elevated-volatility with a neutral-to-bullish bias. Position-health is green, but entry-timing suggests waiting for a pullback before adding.' },
+      ];
+
+      const bubble = (who) => {
+        const wrap = document.createElement('div');
+        if (who === 'user') {
+          wrap.className = 'flex justify-end';
+          wrap.innerHTML = '<div class="max-w-[85%] rounded-2xl rounded-br-sm bg-brand px-3.5 py-2.5 font-medium text-ink-950"></div>';
+        } else if (who === 'tool') {
+          wrap.className = 'flex justify-start';
+          wrap.innerHTML = '<div class="inline-flex items-center gap-2 rounded-lg border border-ocean/20 bg-ocean/5 px-3 py-1.5 font-mono text-xs text-blue-300"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-7 7 2 2 7-7a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2 2.3-2.3z"/></svg><span></span></div>';
+        } else {
+          wrap.className = 'flex justify-start';
+          wrap.innerHTML = '<div class="flex max-w-[88%] gap-2.5"><span class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-brand to-emerald-600 text-ink-950"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-8"/><path d="M16 8h4v4"/></svg></span><div class="rounded-2xl rounded-tl-sm bg-ink-950/70 px-3.5 py-2.5 leading-relaxed text-slate-200"></div></div>';
+        }
+        return wrap;
+      };
+
+      const typingEl = () => {
+        const wrap = document.createElement('div');
+        wrap.className = 'flex justify-start';
+        wrap.innerHTML = '<div class="flex items-center gap-1.5 rounded-2xl rounded-tl-sm bg-ink-950/70 px-4 py-3"><span class="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style="animation-delay:0ms"></span><span class="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style="animation-delay:150ms"></span><span class="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style="animation-delay:300ms"></span></div>';
+        return wrap;
+      };
+
+      const sleep = (ms) => new Promise((r) => setTimeout(r, prefersReduced ? Math.min(ms, 200) : ms));
+
+      async function typeInto(el, text) {
+        if (prefersReduced) { el.textContent = text; return; }
+        for (let i = 0; i < text.length; i++) {
+          el.textContent += text[i];
+          chatBody.scrollTop = chatBody.scrollHeight;
+          if (i % 2 === 0) await sleep(14);
+        }
+      }
+
+      async function runChat() {
+        chatBody.innerHTML = '';
+        for (const step of script) {
+          if (step.who === 'joey') {
+            const t = typingEl();
+            chatBody.appendChild(t);
+            chatBody.scrollTop = chatBody.scrollHeight;
+            await sleep(750);
+            t.remove();
+          }
+          const node = bubble(step.who);
+          chatBody.appendChild(node);
+          chatBody.scrollTop = chatBody.scrollHeight;
+          const textTarget = step.who === 'tool'
+            ? node.querySelector('span:last-child')
+            : (step.who === 'joey' ? node.querySelectorAll('div')[1] : node.querySelector('div'));
+          await typeInto(textTarget, step.text);
+          await sleep(step.who === 'user' ? 500 : 900);
+        }
+        await sleep(3500);
+        runChat();
+      }
+
+      let started = false;
+      const chatIo = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting && !started) { started = true; runChat(); chatIo.disconnect(); }
+        });
+      }, { threshold: 0.3 });
+      chatIo.observe(chatBody);
+    }
+
+    // Animated counters
+    const counters = document.querySelectorAll('[data-count]');
+    const cio = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        const el = e.target;
+        const target = parseFloat(el.dataset.count);
+        const suffix = el.dataset.suffix || '';
+        const dur = 1400;
+        const start = performance.now();
+        const tick = (now) => {
+          const p = Math.min((now - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(target * eased) + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        cio.unobserve(el);
+      });
+    }, { threshold: 0.5 });
+    counters.forEach((el) => cio.observe(el));
+  </script>
+</body>
+</html>
