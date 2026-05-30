@@ -1,10 +1,14 @@
 name: "CI: Checks"
 
+# Disabled automatic triggers for now: this is an open-source template and CI
+# needs to be configured before enabling. Run manually via "Run workflow", or
+# restore the push/pull_request triggers below once CI is set up.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
 
 env:
   NODE_VERSION: '24.x'

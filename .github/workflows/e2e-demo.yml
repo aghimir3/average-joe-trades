@@ -6,10 +6,13 @@
 
 name: "Test: E2E Demo"
 
+# Disabled automatic triggers for now: this is an open-source template and CI
+# needs to be configured before enabling. Run manually via "Run workflow", or
+# restore the pull_request trigger below once CI is set up.
 on:
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+  # pull_request:
+  #   branches: [main]
 
 concurrency:
   group: e2e-demo-${{ github.head_ref || github.ref }}

@@ -13,10 +13,13 @@
 
 name: "Deploy: Azure App Service"
 
+# Disabled automatic deploy for now: this is an open-source template and the
+# Azure credentials/secrets/variables above must be configured first. Deploy
+# manually via "Run workflow", or restore the push trigger below once ready.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+  # push:
+  #   branches: [main]
 
 # Prevent concurrent deployments
 concurrency:
