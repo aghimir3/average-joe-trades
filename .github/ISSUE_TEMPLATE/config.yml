@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Policy
+    url: https://github.com/owner/average-joe-trades/security/policy
+    about: Please do not report vulnerabilities with exploit details in public issues.

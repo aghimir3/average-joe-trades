@@ -1,0 +1,78 @@
+name: Bug Report
+description: Report a bug in Average Joe Trades
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the app is affected?
+      options:
+        - Dashboard / Charts
+        - Positions / Trades
+        - Import / CSV / JSON
+        - Brokerage Sync (SnapTrade)
+        - Options / Wheel Strategy
+        - AI Insights / Ask Joey
+        - Accounts / Settings
+        - Journal
+        - Mobile Layout
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug clearly. What did you expect vs what actually happened?
+      placeholder: |
+        Expected: The P&L chart should show my weekly returns.
+        Actual: The chart is blank and shows "No data available".
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Go to Dashboard → Charts & Calendar
+        2. Select "Weekly" timeframe
+        3. Chart shows blank
+    validations:
+      required: false
+
+  - type: dropdown
+    id: broker
+    attributes:
+      label: Broker (if applicable)
+      options:
+        - N/A
+        - Robinhood
+        - Charles Schwab
+        - Fidelity
+        - Interactive Brokers (IBKR)
+        - Multiple brokers
+    validations:
+      required: false
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - Desktop
+        - Mobile
+        - Both
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, error messages, browser console output, etc.
+    validations:
+      required: false

@@ -1,0 +1,50 @@
+name: "CI: Checks"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '24.x'
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci --prefer-offline --no-audit
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+        env:
+          AUTH_SECRET: ci-placeholder-secret-only
+          AUTH_GOOGLE_ID: ci-placeholder.apps.googleusercontent.com
+          AUTH_GOOGLE_SECRET: ci-placeholder-secret
+          DATABASE_URL: 'sqlserver://localhost:1433;database=dummy;user=sa;password=ci-placeholder;encrypt=false;trustServerCertificate=true'
+          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_DEMO_HOSTNAMES: demo.localhost
+          NEXT_PUBLIC_DEMO_URL: http://demo.localhost:3000
+          NEXT_PUBLIC_FORCE_DEMO: 'false'
+          WEBAUTHN_RP_NAME: Average Joe Trades
+          WEBAUTHN_RP_ID: localhost
+          WEBAUTHN_ORIGIN: http://localhost:3000

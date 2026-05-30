@@ -1,0 +1,63 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the app does this relate to?
+      options:
+        - Dashboard / Charts
+        - Positions / Trades
+        - Import / CSV / JSON
+        - Brokerage Sync (SnapTrade)
+        - Options / Wheel Strategy
+        - AI Insights / Ask Joey
+        - Accounts / Settings
+        - Journal
+        - Mobile Experience
+        - New Page / Feature
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What would you like?
+      description: Describe the feature or improvement clearly.
+      placeholder: |
+        I'd like to see a breakdown of my options income by expiration month,
+        so I can track how much premium I'm collecting over time.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why is this useful?
+      description: What problem does this solve? How would it help your trading workflow?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope estimate
+      description: How big do you think this is?
+      options:
+        - Small (UI tweak, label change, minor fix)
+        - Medium (new component, new chart, new API endpoint)
+        - Large (new page, new integration, architectural change)
+        - Not sure
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, screenshots, links to similar features in other apps, etc.
+    validations:
+      required: false

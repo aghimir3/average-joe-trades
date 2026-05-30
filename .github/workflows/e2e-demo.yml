@@ -1,0 +1,97 @@
+# E2E Tests (Demo Mode)
+#
+# Runs Playwright E2E tests against the demo mode (/demo/* routes).
+# No database or secrets required — demo mode uses pre-seeded
+# TanStack Query cache with no auth and no API calls.
+
+name: "Test: E2E Demo"
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-demo-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24.x'
+
+jobs:
+  e2e-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-e2e-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**/*.ts', '**/*.tsx', '!node_modules/**') }}
+          restore-keys: |
+            nextjs-e2e-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}-
+            nextjs-e2e-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Create auth directory
+        run: mkdir -p e2e/.auth && echo '{"cookies":[],"origins":[]}' > e2e/.auth/user.json
+
+      - name: Build application
+        run: npm run build
+        env:
+          AUTH_SECRET: placeholder-secret-for-ci-build-only
+          AUTH_GOOGLE_ID: placeholder.apps.googleusercontent.com
+          AUTH_GOOGLE_SECRET: placeholder-secret
+          DATABASE_URL: 'sqlserver://localhost:1433;database=dummy;user=sa;password=ci-placeholder;encrypt=false;trustServerCertificate=true'
+          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_PUBLIC_DEMO_HOSTNAMES: demo.localhost
+          NEXT_PUBLIC_DEMO_URL: http://demo.localhost:3000
+          NEXT_PUBLIC_FORCE_DEMO: 'false'
+
+      - name: Create report directories
+        run: mkdir -p e2e-report/screenshots
+
+      - name: Run E2E tests (demo mode)
+        run: npx playwright test e2e/tests/demo.spec.ts
+        env:
+          CI: 'true'
+          AUTH_SECRET: placeholder-secret-for-ci-build-only
+          DATABASE_URL: 'sqlserver://localhost:1433;database=dummy;user=sa;password=ci-placeholder;encrypt=false;trustServerCertificate=true'
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-demo-report
+          path: |
+            e2e-report/
+            e2e-results.json
+          retention-days: 14
+
+      - name: Upload test screenshots and traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-demo-traces
+          path: test-results/
+          retention-days: 7
