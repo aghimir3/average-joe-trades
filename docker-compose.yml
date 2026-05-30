@@ -1,0 +1,73 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${DB_SA_PASSWORD:?Set DB_SA_PASSWORD in .env.local}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -C -Q "SELECT 1" -b
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SITE_URL: "${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}"
+        NEXT_PUBLIC_APP_URL: "${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
+        NEXT_PUBLIC_DEMO_HOSTNAMES: "${NEXT_PUBLIC_DEMO_HOSTNAMES:-demo.localhost}"
+        NEXT_PUBLIC_DEMO_URL: "${NEXT_PUBLIC_DEMO_URL:-http://demo.localhost:3000}"
+        NEXT_PUBLIC_FORCE_DEMO: "${NEXT_PUBLIC_FORCE_DEMO:-false}"
+        NEXT_PUBLIC_APP_NAME: "${NEXT_PUBLIC_APP_NAME:-Average Joe Trades}"
+        NEXT_PUBLIC_REPOSITORY_URL: "${NEXT_PUBLIC_REPOSITORY_URL:-}"
+        NEXT_PUBLIC_SUPPORT_URL: "${NEXT_PUBLIC_SUPPORT_URL:-}"
+        NEXT_PUBLIC_SUPPORT_EMAIL: "${NEXT_PUBLIC_SUPPORT_EMAIL:-}"
+        NEXT_PUBLIC_LEGAL_ENTITY_NAME: "${NEXT_PUBLIC_LEGAL_ENTITY_NAME:-}"
+        NEXT_PUBLIC_COPYRIGHT_NAME: "${NEXT_PUBLIC_COPYRIGHT_NAME:-Average Joe Trades contributors}"
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "sqlserver://db:1433;database=averagejoe;user=sa;password=${DB_SA_PASSWORD:?Set DB_SA_PASSWORD in .env.local};encrypt=false;trustServerCertificate=true"
+      AUTH_SECRET: "${AUTH_SECRET:?Set AUTH_SECRET in .env.local}"
+      NEXTAUTH_URL: "${NEXTAUTH_URL:-http://localhost:3000}"
+      NEXT_PUBLIC_SITE_URL: "${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}"
+      NEXT_PUBLIC_APP_URL: "${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
+      NEXT_PUBLIC_DEMO_HOSTNAMES: "${NEXT_PUBLIC_DEMO_HOSTNAMES:-demo.localhost}"
+      NEXT_PUBLIC_DEMO_URL: "${NEXT_PUBLIC_DEMO_URL:-http://demo.localhost:3000}"
+      NEXT_PUBLIC_FORCE_DEMO: "${NEXT_PUBLIC_FORCE_DEMO:-false}"
+      NEXT_PUBLIC_APP_NAME: "${NEXT_PUBLIC_APP_NAME:-Average Joe Trades}"
+      NEXT_PUBLIC_REPOSITORY_URL: "${NEXT_PUBLIC_REPOSITORY_URL:-}"
+      NEXT_PUBLIC_SUPPORT_URL: "${NEXT_PUBLIC_SUPPORT_URL:-}"
+      NEXT_PUBLIC_SUPPORT_EMAIL: "${NEXT_PUBLIC_SUPPORT_EMAIL:-}"
+      NEXT_PUBLIC_LEGAL_ENTITY_NAME: "${NEXT_PUBLIC_LEGAL_ENTITY_NAME:-}"
+      NEXT_PUBLIC_COPYRIGHT_NAME: "${NEXT_PUBLIC_COPYRIGHT_NAME:-Average Joe Trades contributors}"
+      AUTH_GOOGLE_ID: "${AUTH_GOOGLE_ID:?Set AUTH_GOOGLE_ID in .env.local}"
+      AUTH_GOOGLE_SECRET: "${AUTH_GOOGLE_SECRET:?Set AUTH_GOOGLE_SECRET in .env.local}"
+      SNAPTRADE_CLIENT_ID: "${SNAPTRADE_CLIENT_ID:-}"
+      SNAPTRADE_CONSUMER_KEY: "${SNAPTRADE_CONSUMER_KEY:-}"
+      FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
+      WEBAUTHN_RP_NAME: "${WEBAUTHN_RP_NAME:-Average Joe Trades}"
+      WEBAUTHN_RP_ID: "${WEBAUTHN_RP_ID:-localhost}"
+      WEBAUTHN_ORIGIN: "${WEBAUTHN_ORIGIN:-http://localhost:3000}"
+      AI_PROVIDER: "${AI_PROVIDER:-anthropic}"
+      AI_API_KEY: "${AI_API_KEY:-}"
+      AI_MODEL: "${AI_MODEL:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN:-}"
+      DISCORD_GUILD_ID: "${DISCORD_GUILD_ID:-}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
+      GITHUB_REPO: "${GITHUB_REPO:-}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      NODE_ENV: "production"
+
+volumes:
+  mssql-data:
