@@ -1,0 +1,81 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+/archive/
+
+# Playwright E2E
+/e2e-report/
+/e2e-results.json
+/e2e/.auth/
+/test-results/
+/playwright-report/
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+discord-bot.cjs
+
+# misc
+.DS_Store
+*.pem
+
+# test data (do not commit real trading data)
+Robinhood_*_Trades_*.csv
+*_Trades_*.csv
+*.csv
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+__pycache__/
+scripts/__pycache__/
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# Prisma generated client (v7+)
+/src/generated/
+
+# Claude Code local settings
+.claude/settings.local.json
+.claude/worktrees/
+
+# ThoughtProcess documentation (internal analysis, not for repo)
+ThoughtProcess/
+
+# Archive folder (old planning docs, one-off scripts, etc.)
+/archive/
+
+# Local data exports
+*.bacpac
+*.bak
+*.dump
+*.sql
+*.sqlite
+*.db
+*.pfx
+*.p12
+*.key
