@@ -1,0 +1,1897 @@
+// ============================================================================
+// Average Joe Trades - Ledger-Only Multi-Account Schema (2026)
+// Azure SQL Server / MSSQL Database
+//
+// Financial-grade schema for stock & options trading journal
+// Architecture: Ledger-only source of truth, multi-brokerage account support
+// ============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlserver"
+}
+
+// ============================================================================
+// AUTHENTICATION & USERS
+// ============================================================================
+
+model User {
+  id            String    @id @default(uuid()) @db.UniqueIdentifier
+  email         String    @unique @db.VarChar(255)
+  emailVerified DateTime? @db.DateTime
+  name          String?   @db.VarChar(255)
+  image         String?   @db.VarChar(500)
+  createdAt     DateTime  @default(now()) @db.DateTime
+  updatedAt     DateTime  @updatedAt @db.DateTime
+
+  // Relations
+  accounts              Account[]
+  brokerageAccounts     BrokerageAccount[]
+  importBatches         ImportBatch[]
+  tags                  Tag[]
+  // Ledger system relations
+  ledgerEvents          LedgerEvent[]
+  derivedPositions      DerivedPosition[]
+  realizedCloses        RealizedClose[]
+  dailyAggregates       DailyAggregate[]
+  importIssues          ImportIssue[]
+  tradingGoals          TradingGoal[]
+  // Journal system relations
+  dailyJournals         DailyJournal[]
+  tradeNotes            TradeNote[]
+  // Portfolio policies (one per brokerage account)
+  portfolioPolicies     PortfolioPolicy[]
+  // Service integrations (SnapTrade, etc.)
+  serviceCredentials    ServiceCredential[]
+  loginNicknames        LoginNickname[]
+  // User preferences
+  userSettings          UserSettings?
+  // Broker-provided position/balance data (cached from APIs)
+  brokerPositions       BrokerPosition[]
+  brokerBalances        BrokerBalance[]
+  brokerReturnRates     BrokerReturnRate[]
+  // ML/DL models for wheel strategy
+  wheelMLModels         WheelMLModel[]
+  wheelPredictions      WheelPrediction[]
+  wheelTrainingData     WheelTrainingData[]
+  // ML/DL models for all options trading
+  optionsMLModels       OptionsMLModel[]
+  featureStore          FeatureStore[]
+  tradeEmbeddings       TradeEmbedding[]
+  dailyInsights         DailyInsight[]
+  positionHealthAlerts  PositionHealthAlert[]
+  mlPredictionLogs      MLPredictionLog[]
+  strategySimulations   StrategySimulation[]
+  // User activity tracking
+  userSessions          UserSession[]
+  pageViewEvents        PageViewEvent[]
+  // AI Insights action lifecycle
+  aiActionStates        AIActionState[]
+  // Sentiment logging
+  sentimentEntries      SentimentEntry[]
+  // Quant/AI governance + research runs
+  quantModelRegistry    QuantModelRegistry[]
+  quantModelEvaluations QuantModelEvaluation[]
+  quantBacktestRuns     QuantBacktestRun[]
+  // Sync activity logs
+  syncActivityLogs      SyncActivityLog[]
+  // Trade type overrides (daytrade/swingtrade)
+  tradeClassifications  TradeClassification[]
+  // MCP API keys
+  apiKeys               ApiKey[]
+  // Avin AI chat
+  conversations         Conversation[]
+  @@index([email])
+  @@map("users")
+}
+
+// ServiceCredential - External service credentials (SnapTrade, Plaid, etc.)
+// Separate table for security isolation and multi-service support
+model ServiceCredential {
+  id        String   @id @default(uuid()) @db.UniqueIdentifier
+  userId    String   @db.UniqueIdentifier
+  service   String   @db.VarChar(50) // 'snaptrade', 'plaid', etc.
+
+  // Service-specific credentials. Protect the database and backups for production deployments.
+  serviceUserId     String  @db.VarChar(255) // External service's user ID
+  serviceUserSecret String  @db.VarChar(500) // External service's user secret/token
+
+  // Connection metadata
+  isActive    Boolean   @default(true) @db.Bit
+  lastSyncAt  DateTime? @db.DateTime
+  syncStatus  String?   @db.VarChar(50) // 'success', 'error', 'pending'
+  syncError   String?   @db.NVarChar(1000)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One credential per service per user
+  @@unique([userId, service])
+  @@index([userId])
+  @@index([service])
+  @@map("serviceCredentials")
+}
+
+// ApiKey - Personal API keys for MCP server access
+// Keys are SHA-256 hashed; plaintext shown once at creation, never stored
+model ApiKey {
+  id         String    @id @default(uuid()) @db.UniqueIdentifier
+  userId     String    @db.UniqueIdentifier
+  name       String    @db.VarChar(100)
+  keyHash    String    @unique @db.VarChar(64)
+  keyPrefix  String    @db.VarChar(12)
+  lastUsedAt DateTime? @db.DateTime
+  expiresAt  DateTime? @db.DateTime
+  isActive   Boolean   @default(true) @db.Bit
+  createdAt  DateTime  @default(now()) @db.DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([keyHash])
+  @@map("apiKeys")
+}
+
+// LoginNickname - User-defined names for brokerage login connections
+// Allows users to label multiple logins (e.g., "Mine", "Wife's")
+model LoginNickname {
+  id                       String @id @default(uuid()) @db.UniqueIdentifier
+  userId                   String @db.UniqueIdentifier
+  brokerageAuthorizationId String @db.VarChar(100) // SnapTrade authorization ID
+  nickname                 String @db.NVarChar(50) // User-defined label
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One nickname per authorization per user
+  @@unique([userId, brokerageAuthorizationId])
+  @@index([userId])
+  @@map("loginNicknames")
+}
+
+// UserSettings - User preferences (auto-sync, theme, screen lock, etc.)
+// One settings record per user
+model UserSettings {
+  id     String @id @default(uuid()) @db.UniqueIdentifier
+  userId String @unique @db.UniqueIdentifier
+
+  // Sync preferences
+  autoSyncEnabled Boolean @default(false) @db.Bit // Daily auto-sync on dashboard load
+
+  // Onboarding
+  dashboardTourSeen Boolean @default(false) @db.Bit // Guided tour completed or skipped
+
+  // Screen Lock Settings
+  screenLockEnabled  Boolean @default(false) @db.Bit // Whether screen lock is enabled
+  screenLockTimeout  Int     @default(300) @db.Int   // Timeout in seconds (default: 5 minutes)
+  screenLockPinHash  String? @db.VarChar(255)        // Argon2id hashed PIN (fallback auth)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  webauthnCredentials WebAuthnCredential[]
+
+  @@index([userId])
+  @@map("userSettings")
+}
+
+// WebAuthnCredential - Passkey/biometric credentials for screen lock
+// Stores the public key and metadata for WebAuthn authentication
+model WebAuthnCredential {
+  id             String @id @default(uuid()) @db.UniqueIdentifier
+  userSettingsId String @db.UniqueIdentifier
+
+  // Credential identification
+  credentialId     String @unique @db.VarChar(512) // Base64URL encoded credential ID
+  publicKey        String @db.VarChar(2000)        // Base64URL encoded public key
+  counter          Int    @default(0) @db.Int      // Sign counter for replay protection
+
+  // Credential metadata
+  deviceName       String?   @db.VarChar(100)      // User-friendly name (e.g., "iPhone 15 Pro")
+  transports       String?   @db.VarChar(100)      // JSON array of transports (e.g., ["internal", "hybrid"])
+  credentialType   String    @default("public-key") @db.VarChar(20)
+  attestationType  String?   @db.VarChar(20)       // none, indirect, direct, enterprise
+
+  // Security tracking
+  lastUsedAt       DateTime? @db.DateTime
+  createdAt        DateTime  @default(now()) @db.DateTime
+
+  // Relations
+  userSettings UserSettings @relation(fields: [userSettingsId], references: [id], onDelete: Cascade)
+
+  @@index([userSettingsId])
+  @@index([credentialId])
+  @@map("webauthnCredentials")
+}
+
+// Account - NextAuth OAuth provider accounts (Google, etc.)
+// Note: Named "Account" for NextAuth PrismaAdapter compatibility
+model Account {
+  id                String  @id @default(uuid()) @db.UniqueIdentifier
+  userId            String  @db.UniqueIdentifier
+  type              String  @db.VarChar(50)
+  provider          String  @db.VarChar(50)
+  providerAccountId String  @db.VarChar(255)
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?    @db.Int
+  token_type        String? @db.VarChar(50)
+  scope             String? @db.Text
+  id_token          String? @db.Text
+  session_state     String? @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts") // Keep table name for NextAuth compatibility
+}
+
+model VerificationToken {
+  identifier String   @db.VarChar(255)
+  token      String   @unique @db.VarChar(255)
+  expires    DateTime @db.DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================================================
+// BROKERAGE ACCOUNTS (Multi-Account Support)
+// ============================================================================
+
+// BrokerageAccount - User's trading accounts at various brokerages
+// Examples: "Robinhood Individual", "Schwab IRA", "Fidelity 401k"
+// A default "Individual" account with broker="manual" is auto-created for new users
+model BrokerageAccount {
+  id     String @id @default(uuid()) @db.UniqueIdentifier
+  userId String @db.UniqueIdentifier
+
+  // Account identification
+  broker            String  @db.VarChar(50) // 'manual' | 'robinhood' | 'schwab' | 'fidelity' | etc.
+  name              String  @db.VarChar(100) // Display name: "Individual", "Robinhood", "Schwab IRA"
+  externalAccountId String? @db.VarChar(255) // Broker's account ID if available
+
+  // SnapTrade OAuth connection tracking
+  // Groups accounts from the same OAuth connection (e.g., user's Robinhood vs spouse's Robinhood)
+  // Multiple BrokerageAccounts can share the same brokerageAuthorizationId
+  // (e.g., Individual + Roth IRA from one person's Robinhood auth)
+  brokerageAuthorizationId String? @db.VarChar(255)
+
+  // Settings
+  currency  String  @default("USD") @db.VarChar(10)
+  isDefault Boolean @default(false) @db.Bit // First account is default
+  isActive  Boolean @default(true) @db.Bit // Can be deactivated without deletion
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEvents     LedgerEvent[]
+  importBatches    ImportBatch[]
+  derivedPositions DerivedPosition[]
+  realizedCloses   RealizedClose[]
+  dailyAggregates  DailyAggregate[]
+  portfolioPolicy  PortfolioPolicy?
+  // Broker-provided data (cached from APIs)
+  brokerPositions   BrokerPosition[]
+  brokerBalances    BrokerBalance[]
+  brokerReturnRates BrokerReturnRate[]
+  tradingGoals      TradingGoal[]
+  // Sync activity logs
+  syncActivityLogs  SyncActivityLog[]
+
+  // Note: Multiple accounts per broker are allowed (e.g., multiple Robinhood accounts)
+  // When syncing with external services, each external account maps to one BrokerageAccount
+  // The unique constraint is enforced at the application level for non-null externalAccountId
+  // Indexes
+  @@index([userId])
+  @@index([userId, isDefault])
+  @@index([userId, broker])
+  @@index([userId, externalAccountId])
+  @@index([userId, brokerageAuthorizationId])
+  @@map("brokerageAccounts")
+}
+
+// ============================================================================
+// IMPORT SYSTEM
+// ============================================================================
+
+model ImportBatch {
+  id                 String @id @default(uuid()) @db.UniqueIdentifier
+  userId             String @db.UniqueIdentifier
+  brokerageAccountId String @db.UniqueIdentifier // Which account this import belongs to
+
+  // Source identification
+  fileName   String @db.VarChar(255)
+  broker     String @db.VarChar(50) // 'robinhood' | 'schwab' | 'fidelity' | etc.
+  sourceType String @default("import") @db.VarChar(20) // 'import' | 'manual' | 'api'
+
+  // Processing Status
+  status String @default("pending") @db.VarChar(20) // 'pending' | 'processing' | 'completed' | 'failed'
+
+  // Import Metrics
+  totalRows      Int @default(0) @db.Int
+  parsedRows     Int @default(0) @db.Int
+  validatedRows  Int @default(0) @db.Int
+  duplicateRows  Int @default(0) @db.Int
+  importedEvents Int @default(0) @db.Int // Renamed from importedTrades
+  skippedRows    Int @default(0) @db.Int
+
+  // Detailed Tracking
+  skipReasons  String? @db.Text // JSON: [{row, reason, symbol}]
+  warnings     String? @db.Text // JSON: [{row, message, symbol}]
+  errorMessage String? @db.Text
+
+  // Date Range
+  tradeStartDate DateTime? @db.DateTime
+  tradeEndDate   DateTime? @db.DateTime
+
+  // Archiving
+  isArchived Boolean   @default(false) @db.Bit
+  archivedAt DateTime? @db.DateTime
+  archivedBy String?   @db.UniqueIdentifier
+
+  // Timestamps
+  createdAt   DateTime  @default(now()) @db.DateTime
+  startedAt   DateTime? @db.DateTime
+  completedAt DateTime? @db.DateTime
+
+  // Relations
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ledgerEvents     LedgerEvent[]
+
+  @@index([userId, createdAt])
+  @@index([userId, isArchived])
+  @@index([userId, sourceType])
+  @@index([brokerageAccountId])
+  @@index([status])
+  @@map("importBatches")
+}
+
+// ============================================================================
+// LEDGER SYSTEM (Source of Truth)
+// ============================================================================
+
+// LedgerEvent - Immutable record of every transaction (manual + imports)
+// This is the SINGLE SOURCE OF TRUTH for all trading activity.
+// - Every transaction becomes one LedgerEvent
+// - Append-only (never modified, only soft-deleted for corrections)
+// - eventHash ensures idempotency
+// - Positions and P&L are DERIVED from this ledger
+model LedgerEvent {
+  id                 String  @id @default(uuid()) @db.UniqueIdentifier
+  userId             String  @db.UniqueIdentifier
+  brokerageAccountId String  @db.UniqueIdentifier
+  importBatchId      String? @db.UniqueIdentifier // Nullable for manual entries
+
+  // Source tracking
+  broker              String  @db.VarChar(50) // 'manual' | 'robinhood' | 'schwab' | etc.
+  sourceType          String  @db.VarChar(20) // 'manual' | 'import' | 'api'
+  sourceTransactionId String? @db.VarChar(255) // Broker-provided transaction ID if available
+
+  // =========== Core Transaction Fields ===========
+  activityDate DateTime  @db.DateTime // Normalized to UTC noon
+  activityTime String?   @db.VarChar(5) // Optional time of day (HH:MM format, e.g., "09:30")
+  processDate  DateTime? @db.DateTime
+  settleDate   DateTime? @db.DateTime
+  instrument   String    @db.VarChar(255) // Raw instrument description
+  description  String?   @db.NVarChar(1000) // Full description
+  transCode    String    @db.VarChar(20) // BUY, SELL, BTO, STO, BTC, STC, OEXP, OASGN, etc.
+  quantity     Decimal   @db.Decimal(18, 6)
+  price        Decimal?  @db.Decimal(18, 6)
+  amount       Decimal?  @db.Decimal(18, 6)
+  fees         Decimal?  @db.Decimal(10, 4) // Transaction fees if tracked
+
+  // =========== Normalized/Parsed Fields ===========
+  symbol     String    @db.VarChar(20) // Normalized ticker symbol
+  eventType  String    @db.VarChar(30) // EQUITY_STOCK, EQUITY_OPTION, CASH_MOVEMENT, etc.
+  action     String?   @db.VarChar(20) // buy, sell, expired, assigned, dividend, etc.
+  isOption   Boolean   @default(false) @db.Bit
+  optionType String?   @db.VarChar(4) // call, put
+  strike     Decimal?  @db.Decimal(18, 6)
+  expiration DateTime? @db.Date
+
+  // =========== Strategy & Grouping (for manual entries) ===========
+  strategy        String? @db.VarChar(50) // User-specified strategy
+  positionGroupId String? @db.VarChar(64) // Groups related legs of a spread
+  notes           String? @db.NVarChar(1000) // User notes for manual entries
+
+  // =========== Underlying Price (for options) ===========
+  // The price of the underlying stock at the time of this option transaction.
+  // Useful for analyzing option trades relative to underlying movement.
+  underlyingPrice Decimal? @db.Decimal(18, 6)
+
+  // =========== Idempotency ===========
+  // Hash of (userId, brokerageAccountId, activityDate, symbol, instrumentKey, transCode, qty, price, amount, sourceTransactionId)
+  eventHash String @unique @db.VarChar(64)
+
+  // =========== Audit Trail ===========
+  createdAt DateTime  @default(now()) @db.DateTime
+  deletedAt DateTime? @db.DateTime // Soft delete for corrections
+
+  // Relations
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  importBatch      ImportBatch?     @relation(fields: [importBatchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Derivation links
+  positionOpenEvents  PositionLedgerLink[] @relation("OpenEvent")
+  positionCloseEvents PositionLedgerLink[] @relation("CloseEvent")
+
+  // Indexes
+  @@index([userId, activityDate])
+  @@index([userId, brokerageAccountId, activityDate])
+  @@index([userId, symbol, activityDate])
+  @@index([userId, eventType])
+  @@index([userId, deletedAt])
+  @@index([userId, isOption])
+  @@index([brokerageAccountId, symbol, activityDate])
+  @@index([brokerageAccountId, isOption])
+  @@index([brokerageAccountId, transCode])
+  @@index([importBatchId])
+  @@index([symbol, isOption, strike, expiration])
+  @@index([positionGroupId])
+  @@map("ledgerEvents")
+}
+
+// ============================================================================
+// DERIVED DATA (Computed from Ledger)
+// ============================================================================
+
+// DerivedPosition - Computed open positions from ledger events
+// Re-derived whenever ledger changes. NOT the source of truth.
+model DerivedPosition {
+  id                 String @id @default(uuid()) @db.UniqueIdentifier
+  userId             String @db.UniqueIdentifier
+  brokerageAccountId String @db.UniqueIdentifier
+
+  // Position identification (instrument key)
+  symbol       String @db.VarChar(20)
+  positionType String @db.VarChar(10) // stock, option
+  side         String @db.VarChar(10) // long, short
+
+  // Option details (null for stocks)
+  optionType String?   @db.VarChar(4) // call, put
+  strike     Decimal?  @db.Decimal(18, 6)
+  expiration DateTime? @db.Date
+
+  // Position data
+  quantity  Decimal @db.Decimal(18, 6) // Remaining open quantity
+  costBasis Decimal @db.Decimal(18, 6) // Total cost basis
+  avgPrice  Decimal @db.Decimal(18, 6) // Average entry price
+
+  // Dates
+  firstEntryDate DateTime @db.DateTime
+  lastEntryDate  DateTime @db.DateTime
+
+  // Strategy (from manual entries or detected)
+  strategy String? @db.VarChar(50)
+
+  // Derivation metadata
+  derivedAt         DateTime @default(now()) @db.DateTime
+  derivationVersion Int      @default(1) @db.Int
+
+  // Relations
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount     @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ledgerLinks      PositionLedgerLink[]
+
+  // Unique per instrument per account
+  @@unique([userId, brokerageAccountId, symbol, positionType, side, optionType, strike, expiration])
+  @@index([userId])
+  @@index([userId, brokerageAccountId])
+  @@index([userId, symbol])
+  @@index([brokerageAccountId])
+  @@map("derivedPositions")
+}
+
+// RealizedClose - Computed closed trades with P&L
+// Each row = one matched open-close sequence (FIFO)
+model RealizedClose {
+  id                 String @id @default(uuid()) @db.UniqueIdentifier
+  userId             String @db.UniqueIdentifier
+  brokerageAccountId String @db.UniqueIdentifier
+
+  // Instrument identification
+  symbol    String @db.VarChar(20)
+  closeType String @db.VarChar(10) // stock, option
+  side      String @db.VarChar(10) // long, short
+
+  // Option details (null for stocks)
+  optionType String?   @db.VarChar(4) // call, put
+  strike     Decimal?  @db.Decimal(18, 6)
+  expiration DateTime? @db.Date
+  strategy   String?   @db.VarChar(50)
+
+  // Trade lifecycle
+  openDate  DateTime @db.DateTime
+  openTime  String?  @db.VarChar(5) // HH:MM format (e.g., "09:30", "14:45")
+  closeDate DateTime @db.DateTime
+  closeTime String?  @db.VarChar(5) // HH:MM format (e.g., "09:30", "14:45")
+  quantity  Decimal  @db.Decimal(18, 6)
+
+  // Pricing
+  openPrice   Decimal @db.Decimal(18, 6)
+  closePrice  Decimal @db.Decimal(18, 6)
+  openAmount  Decimal @db.Decimal(18, 6)
+  closeAmount Decimal @db.Decimal(18, 6)
+
+  // P&L
+  realizedPnL Decimal  @db.Decimal(18, 6)
+  fees        Decimal? @db.Decimal(10, 4)
+
+  // Close reason
+  closeReason String @db.VarChar(20) // normal, expired, assigned
+
+  // Underlying price tracking (for options)
+  // Captured from source LedgerEvents during derivation
+  underlyingPriceAtOpen  Decimal? @db.Decimal(18, 6)
+  underlyingPriceAtClose Decimal? @db.Decimal(18, 6)
+
+  // Assignment tracking
+  isAssignment        Boolean  @default(false) @db.Bit
+  assignedStockSymbol String?  @db.VarChar(20)
+  assignedStockQty    Decimal? @db.Decimal(18, 6)
+  assignedStockPrice  Decimal? @db.Decimal(18, 6)
+
+  // Wheel tracking
+  isWheelTrade Boolean @default(false) @db.Bit
+  wheelCycleId String? @db.VarChar(64)
+
+  // Unknown basis flag
+  hasUnknownBasis Boolean @default(false) @db.Bit
+
+  // Derivation metadata
+  derivedAt         DateTime @default(now()) @db.DateTime
+  derivationVersion Int      @default(1) @db.Int
+
+  // Relations
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount     @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  ledgerLinks      PositionLedgerLink[]
+
+  // Indexes
+  @@index([userId, closeDate])
+  @@index([userId, brokerageAccountId, closeDate])
+  @@index([userId, symbol])
+  @@index([userId, strategy])
+  @@index([userId, isWheelTrade])
+  @@index([userId, hasUnknownBasis])
+  @@index([brokerageAccountId])
+  @@index([brokerageAccountId, closeDate])
+  @@index([brokerageAccountId, hasUnknownBasis])
+  @@map("realizedCloses")
+}
+
+// PositionLedgerLink - Audit trail linking positions/closes to source events
+model PositionLedgerLink {
+  id String @id @default(uuid()) @db.UniqueIdentifier
+
+  // Link to derived entities (nullable - links to one or the other)
+  positionId      String? @db.UniqueIdentifier
+  realizedCloseId String? @db.UniqueIdentifier
+
+  // Link to ledger events
+  openEventId  String? @db.UniqueIdentifier
+  closeEventId String? @db.UniqueIdentifier
+
+  // Quantity attribution
+  quantity Decimal @db.Decimal(18, 6)
+
+  // Link type for audit
+  linkType String @db.VarChar(20) // open, close, partial_open, partial_close
+
+  createdAt DateTime @default(now()) @db.DateTime
+
+  // Relations
+  position      DerivedPosition? @relation(fields: [positionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  realizedClose RealizedClose?   @relation(fields: [realizedCloseId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  openEvent     LedgerEvent?     @relation("OpenEvent", fields: [openEventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  closeEvent    LedgerEvent?     @relation("CloseEvent", fields: [closeEventId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([positionId])
+  @@index([realizedCloseId])
+  @@index([openEventId])
+  @@index([closeEventId])
+  @@map("positionLedgerLinks")
+}
+
+// DailyAggregate - Pre-computed daily P&L (per account + optional all-accounts rollup)
+model DailyAggregate {
+  id                 String  @id @default(uuid()) @db.UniqueIdentifier
+  userId             String  @db.UniqueIdentifier
+  brokerageAccountId String? @db.UniqueIdentifier // NULL = all-accounts rollup
+
+  // Date (normalized to UTC midnight)
+  date DateTime @db.Date
+
+  // Aggregates
+  realizedPnL Decimal @db.Decimal(18, 6)
+  tradeCount  Int     @db.Int
+  winCount    Int     @db.Int
+  lossCount   Int     @db.Int
+
+  // Breakdown by type
+  stockPnL      Decimal @db.Decimal(18, 6)
+  optionPnL     Decimal @db.Decimal(18, 6)
+  wheelPremiums Decimal @db.Decimal(18, 6)
+
+  // Derivation metadata
+  derivedAt DateTime @default(now()) @db.DateTime
+
+  // Relations
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount? @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Unique per date per account (or all accounts if null)
+  @@unique([userId, brokerageAccountId, date])
+  @@index([userId, date])
+  @@index([userId, brokerageAccountId, date])
+  @@map("dailyAggregates")
+}
+
+// ============================================================================
+// IMPORT ISSUES (Audit Trail)
+// ============================================================================
+
+model ImportIssue {
+  id            String  @id @default(uuid()) @db.UniqueIdentifier
+  userId        String  @db.UniqueIdentifier
+  importBatchId String? @db.UniqueIdentifier
+
+  // Issue classification
+  issueType String @db.VarChar(50) // unknown_basis, parse_error, duplicate, etc.
+  severity  String @db.VarChar(20) // error, warning, info
+
+  // Related entities
+  ledgerEventId   String? @db.UniqueIdentifier
+  realizedCloseId String? @db.UniqueIdentifier
+
+  // Details
+  symbol  String? @db.VarChar(20)
+  message String  @db.NVarChar(1000)
+  details String? @db.NVarChar(Max) // JSON
+
+  // Resolution tracking
+  isResolved Boolean   @default(false) @db.Bit
+  resolvedAt DateTime? @db.DateTime
+  resolvedBy String?   @db.UniqueIdentifier
+  resolution String?   @db.NVarChar(500)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isResolved])
+  @@index([userId, issueType])
+  @@index([importBatchId])
+  @@index([ledgerEventId])
+  @@map("importIssues")
+}
+
+// ============================================================================
+// TRADING GOALS
+// ============================================================================
+
+// TradingGoal - User-defined P&L targets for tracking progress
+// Goals can be set per account or as aggregate (NULL = aggregate goal for "All Accounts")
+model TradingGoal {
+  id                 String  @id @default(uuid()) @db.UniqueIdentifier
+  userId             String  @db.UniqueIdentifier
+  brokerageAccountId String? @db.UniqueIdentifier // NULL = aggregate goal for "All Accounts"
+
+  // Goal configuration
+  goalType   String  @db.VarChar(20) // 'weekly' | 'monthly' | 'premium_weekly' | 'premium_monthly'
+  targetPnL  Decimal @db.Decimal(18, 6) // Target P&L amount
+  isActive   Boolean @default(true) @db.Bit
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount? @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Only one active goal per type per account (or per user for aggregate)
+  @@unique([userId, brokerageAccountId, goalType, isActive])
+  @@index([userId])
+  @@index([userId, goalType])
+  @@index([userId, isActive])
+  @@index([brokerageAccountId])
+  @@map("tradingGoals")
+}
+
+// ============================================================================
+// JOURNAL SYSTEM
+// ============================================================================
+
+// DailyJournal - Pre/post market journal entries with trading reflections
+model DailyJournal {
+  id     String   @id @default(uuid()) @db.UniqueIdentifier
+  userId String   @db.UniqueIdentifier
+  date   DateTime @db.Date // Journal date (one per day)
+
+  // Pre-market preparation
+  preMarketNotes   String? @db.NVarChar(4000) // Market outlook, plan for the day
+  preMarketMood    String? @db.VarChar(20) // confident, neutral, cautious, anxious
+  watchlist        String? @db.NVarChar(1000) // Tickers watching today (comma-separated or JSON)
+  keyLevels        String? @db.NVarChar(1000) // Support/resistance levels to watch
+
+  // Health & wellness (affects trading performance)
+  hoursSlept       Decimal? @db.Decimal(3, 1) // e.g., 7.5 hours
+  sleepQuality     String?  @db.VarChar(20) // excellent, good, fair, poor
+  exercised        Boolean? @db.Bit
+  caffeineIntake   String?  @db.VarChar(20) // none, light, moderate, heavy
+  stressLevel      Int?     @db.TinyInt // 1-10 scale
+
+  // Post-market review
+  postMarketNotes  String? @db.NVarChar(4000) // What happened, lessons learned
+  emotionalState   String? @db.VarChar(20) // calm, disciplined, frustrated, greedy, fearful
+  followedPlan     Boolean? @db.Bit // Did you stick to your plan?
+  biggestWin       String? @db.NVarChar(500) // Best trade/decision of the day
+  biggestMistake   String? @db.NVarChar(500) // Worst trade/decision of the day
+  lessonsLearned   String? @db.NVarChar(2000) // Key takeaways
+
+  // Market conditions
+  marketCondition  String? @db.VarChar(30) // bullish, bearish, choppy, trending, ranging
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One journal entry per day per user
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("dailyJournals")
+}
+
+// TradeNote - Notes attached to specific trades (ledger events or realized closes)
+model TradeNote {
+  id              String  @id @default(uuid()) @db.UniqueIdentifier
+  userId          String  @db.UniqueIdentifier
+  ledgerEventId   String? @db.UniqueIdentifier // Link to opening trade
+  realizedCloseId String? @db.UniqueIdentifier // Link to closed trade
+
+  // Note content
+  noteType String @db.VarChar(30) // entry_thesis, exit_review, adjustment, general
+  content  String @db.NVarChar(4000)
+
+  // Trade analysis fields
+  entryReason     String? @db.NVarChar(1000) // Why did you enter?
+  exitReason      String? @db.NVarChar(1000) // Why did you exit?
+  whatWorked      String? @db.NVarChar(1000) // What went well?
+  whatDidntWork   String? @db.NVarChar(1000) // What could be improved?
+  emotionAtEntry  String? @db.VarChar(20) // confident, uncertain, fomo, fearful
+  emotionAtExit   String? @db.VarChar(20) // satisfied, regretful, relieved, frustrated
+
+  // Rating
+  tradeRating Int? @db.TinyInt // 1-5 star rating
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, ledgerEventId])
+  @@index([userId, realizedCloseId])
+  @@index([userId, createdAt])
+  @@map("tradeNotes")
+}
+
+// ============================================================================
+// PORTFOLIO POLICY
+// ============================================================================
+
+// PortfolioPolicy - Trading rules, risk management, and investment policy per brokerage account
+model PortfolioPolicy {
+  id                 String  @id @default(uuid()) @db.UniqueIdentifier
+  userId             String  @db.UniqueIdentifier
+  brokerageAccountId String? @unique @db.UniqueIdentifier // NULL = default policy for all accounts
+
+  // =========== TRADING RULES ===========
+  // Position sizing
+  maxPositionSizePercent   Decimal? @db.Decimal(5, 2) // Max % of portfolio per position
+  maxPositionSizeDollars   Decimal? @db.Decimal(18, 2) // Max $ per position
+  defaultPositionSize      Decimal? @db.Decimal(18, 2) // Default position size
+
+  // Entry/Exit criteria
+  entryRules               String?  @db.NVarChar(4000) // User's entry criteria
+  exitRules                String?  @db.NVarChar(4000) // User's exit criteria
+
+  // Trade management
+  maxOpenPositions         Int?     @db.Int // Max concurrent positions
+  maxDailyTrades           Int?     @db.Int // Max trades per day
+  maxDailyLoss             Decimal? @db.Decimal(18, 2) // Daily loss limit to stop trading
+
+  // Trading schedule
+  tradingHoursStart        String?  @db.VarChar(5) // HH:MM format (e.g., "09:30")
+  tradingHoursEnd          String?  @db.VarChar(5) // HH:MM format (e.g., "16:00")
+  tradingDays              String?  @db.VarChar(20) // Comma-separated days (e.g., "mon,tue,wed,thu,fri")
+
+  // =========== RISK MANAGEMENT ===========
+  // Stop-loss rules
+  defaultStopLossPercent   Decimal? @db.Decimal(5, 2) // Default stop-loss %
+  maxStopLossPercent       Decimal? @db.Decimal(5, 2) // Never risk more than this %
+  useTrailingStops         Boolean? @db.Bit
+  trailingStopPercent      Decimal? @db.Decimal(5, 2)
+
+  // Drawdown limits
+  maxDrawdownPercent       Decimal? @db.Decimal(5, 2) // Max portfolio drawdown
+  maxWeeklyLossPercent     Decimal? @db.Decimal(5, 2) // Weekly loss limit
+  maxMonthlyLossPercent    Decimal? @db.Decimal(5, 2) // Monthly loss limit
+
+  // Sector/concentration limits
+  maxSectorExposurePercent Decimal? @db.Decimal(5, 2) // Max exposure to any sector
+  maxSingleStockPercent    Decimal? @db.Decimal(5, 2) // Max single stock exposure
+
+  // Options-specific risk
+  maxOptionsPercent        Decimal? @db.Decimal(5, 2) // Max portfolio % in options
+  maxNakedPutsPercent      Decimal? @db.Decimal(5, 2) // Max % in cash-secured puts
+  maxCoveredCallsPercent   Decimal? @db.Decimal(5, 2) // Max % in covered calls
+  minDaysToExpiration      Int?     @db.Int // Minimum DTE for new options
+
+  // =========== INVESTMENT POLICY ===========
+  // Asset allocation targets
+  targetStockPercent       Decimal? @db.Decimal(5, 2)
+  targetOptionsPercent     Decimal? @db.Decimal(5, 2)
+  targetCashPercent        Decimal? @db.Decimal(5, 2)
+
+  // Rebalancing
+  rebalanceFrequency       String?  @db.VarChar(20) // weekly, monthly, quarterly, annually
+  rebalanceThreshold       Decimal? @db.Decimal(5, 2) // Rebalance if off target by this %
+
+  // Investment style
+  investmentTimeHorizon    String?  @db.VarChar(20) // day, swing, position, long-term
+  riskTolerance            String?  @db.VarChar(20) // conservative, moderate, aggressive
+
+  // Diversification rules
+  minPositions             Int?     @db.Int // Minimum positions for diversification
+  maxCorrelatedPositions   Int?     @db.Int // Max positions in correlated assets
+
+  // =========== PERSONAL NOTES & RULES ===========
+  personalTradingRules     String?  @db.NVarChar(Max) // Free-form trading rules/reminders
+  preTradeChecklist        String?  @db.NVarChar(Max) // Checklist before entering trades
+  emotionalRules           String?  @db.NVarChar(Max) // Rules for managing emotions
+  marketConditionRules     String?  @db.NVarChar(Max) // Rules for different market conditions
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount? @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // One policy per account (or one default policy with null brokerageAccountId)
+  @@unique([userId, brokerageAccountId])
+  @@index([userId])
+  @@index([brokerageAccountId])
+  @@map("portfolioPolicies")
+}
+
+// ============================================================================
+// API REQUEST LOGGING
+// ============================================================================
+
+// ApiRequestLog - Logs all external API requests and responses for debugging
+// Used for SnapTrade, Plaid, and other external service integrations
+model ApiRequestLog {
+  id     String @id @default(uuid()) @db.UniqueIdentifier
+  userId String @db.UniqueIdentifier
+
+  // Request identification
+  service     String @db.VarChar(50) // 'snaptrade', 'plaid', etc.
+  endpoint    String @db.VarChar(255) // API endpoint called
+  method      String @db.VarChar(10) // GET, POST, PUT, DELETE
+
+  // Request details
+  requestParams  String? @db.NVarChar(Max) // JSON of request parameters (sanitized)
+  requestHeaders String? @db.NVarChar(Max) // JSON of request headers (sanitized, no auth)
+
+  // Response details
+  statusCode     Int?     @db.Int
+  responseBody   String?  @db.NVarChar(Max) // JSON response (may be truncated)
+  responseSize   Int?     @db.Int // Size in bytes
+
+  // Timing
+  durationMs     Int?     @db.Int // Request duration in milliseconds
+
+  // Error tracking
+  isError        Boolean  @default(false) @db.Bit
+  errorMessage   String?  @db.NVarChar(1000)
+  errorCode      String?  @db.VarChar(50)
+
+  // Context
+  correlationId  String?  @db.VarChar(64) // Link to related requests
+  triggeredBy    String?  @db.VarChar(100) // What triggered this call (e.g., "sync_transactions")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+
+  // Indexes for querying
+  @@index([userId, createdAt])
+  @@index([userId, service])
+  @@index([service, endpoint])
+  @@index([correlationId])
+  @@index([isError])
+  @@map("apiRequestLogs")
+}
+
+// ============================================================================
+// SYNC ACTIVITY LOG - User-facing sync workflow tracking
+// ============================================================================
+
+model SyncActivityLog {
+  id     String @id @default(uuid()) @db.UniqueIdentifier
+  userId String @db.UniqueIdentifier
+
+  // Event identification
+  eventType String @db.VarChar(50) // 'connection_initiated', 'oauth_completed', 'accounts_discovered', etc.
+  broker    String @db.VarChar(50) // 'robinhood', 'schwab', etc.
+
+  // Account context (optional - not all events have an account)
+  brokerageAccountId String? @db.UniqueIdentifier
+  accountName        String? @db.VarChar(255)
+
+  // Event details
+  message     String  @db.NVarChar(500)  // Human-readable message
+  details     String? @db.NVarChar(Max)  // JSON with additional context
+  isError     Boolean @default(false) @db.Bit
+  errorCode   String? @db.VarChar(50)
+
+  // Correlation for linking related events
+  correlationId String? @db.VarChar(64)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+
+  // Relations (NoAction to avoid cyclic referential actions via User -> BrokerageAccount -> SyncActivityLog)
+  user             User              @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  brokerageAccount BrokerageAccount? @relation(fields: [brokerageAccountId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([userId, createdAt])
+  @@index([userId, eventType])
+  @@index([userId, broker])
+  @@index([brokerageAccountId])
+  @@index([correlationId])
+  @@index([isError])
+  @@map("syncActivityLogs")
+}
+
+// ============================================================================
+// TAGGING SYSTEM (Future Feature)
+// ============================================================================
+
+model Tag {
+  id     String  @id @default(uuid()) @db.UniqueIdentifier
+  userId String  @db.UniqueIdentifier
+  name   String  @db.VarChar(50)
+  color  String? @db.VarChar(20)
+
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventTags EventTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("tags")
+}
+
+// EventTag - Tags applied to ledger events (not legacy trades)
+model EventTag {
+  id            String   @id @default(uuid()) @db.UniqueIdentifier
+  ledgerEventId String   @db.UniqueIdentifier
+  tagId         String   @db.UniqueIdentifier
+  createdAt     DateTime @default(now()) @db.DateTime
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([ledgerEventId, tagId])
+  @@index([ledgerEventId])
+  @@index([tagId])
+  @@map("eventTags")
+}
+
+// ============================================================================
+// BROKER-PROVIDED DATA (Cached from SnapTrade/APIs)
+// ============================================================================
+
+// BrokerPosition - Cached position data from SnapTrade API
+// Refreshed on-demand or periodically, NOT the source of truth for transactions
+// Use this for real-time position view; use DerivedPosition for manual accounts
+model BrokerPosition {
+  id                 String @id @default(uuid()) @db.UniqueIdentifier
+  userId             String @db.UniqueIdentifier
+  brokerageAccountId String @db.UniqueIdentifier
+
+  // Position identification
+  symbol       String @db.VarChar(50)
+  positionType String @db.VarChar(10) // stock, option
+
+  // Option details (null for stocks)
+  optionType String?   @db.VarChar(4) // call, put
+  strike     Decimal?  @db.Decimal(18, 6)
+  expiration DateTime? @db.Date
+
+  // Position data from brokerage
+  quantity         Decimal  @db.Decimal(18, 6)
+  marketPrice      Decimal? @db.Decimal(18, 6) // Current market price per share/contract
+  marketValue      Decimal? @db.Decimal(18, 6) // quantity * price (total value)
+  avgCostBasis     Decimal? @db.Decimal(18, 6) // Brokerage-provided cost basis per share
+  unrealizedPnL    Decimal? @db.Decimal(18, 6) // Brokerage-provided open P&L
+  unrealizedPnLPct Decimal? @db.Decimal(10, 4) // Unrealized P&L %
+
+  // Price change tracking (since last sync)
+  previousPrice  Decimal? @db.Decimal(18, 6) // Price at previous sync
+  priceChangeAbs Decimal? @db.Decimal(18, 6) // Current - Previous price
+  priceChangePct Decimal? @db.Decimal(10, 4) // % change since last sync
+
+  // Currency
+  currency String @default("USD") @db.VarChar(10)
+
+  // Data source tracking
+  snaptradeSyncId String? @db.VarChar(64) // Correlation ID for sync
+  dataSource      String  @db.VarChar(20) // 'snaptrade'
+
+  // Freshness tracking
+  lastSyncAt DateTime @db.DateTime
+  isStale    Boolean  @default(false) @db.Bit
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Unique per instrument per account
+  @@unique([brokerageAccountId, symbol, positionType, optionType, strike, expiration])
+  @@index([userId])
+  @@index([brokerageAccountId])
+  @@index([lastSyncAt])
+  @@index([userId, isStale])
+  @@map("brokerPositions")
+}
+
+// BrokerBalance - Cached account balance data from SnapTrade API
+// Each account may have multiple balances (one per currency)
+model BrokerBalance {
+  id                 String @id @default(uuid()) @db.UniqueIdentifier
+  userId             String @db.UniqueIdentifier
+  brokerageAccountId String @db.UniqueIdentifier
+
+  // Balance data
+  currency    String   @db.VarChar(10)
+  cash        Decimal? @db.Decimal(18, 6)
+  buyingPower Decimal? @db.Decimal(18, 6) // May be null for non-margin accounts
+
+  // Freshness
+  lastSyncAt DateTime @db.DateTime
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  // Relations
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // One balance per currency per account
+  @@unique([brokerageAccountId, currency])
+  @@index([userId])
+  @@index([brokerageAccountId])
+  @@map("brokerBalances")
+}
+
+// BrokerReturnRate - Cached performance data from brokerage
+// Stores return percentages for various timeframes (ALL, 1Y, 6M, 3M, 1M)
+model BrokerReturnRate {
+  id                 String @id @default(uuid()) @db.UniqueIdentifier
+  userId             String @db.UniqueIdentifier
+  brokerageAccountId String @db.UniqueIdentifier
+
+  // Performance data
+  timeframe     String  @db.VarChar(10) // ALL, 1Y, 6M, 3M, 1M
+  returnPercent Decimal @db.Decimal(10, 4) // e.g., 5.97 = 5.97%
+
+  // Freshness
+  lastSyncAt DateTime @db.DateTime
+
+  // Timestamps
+  createdAt DateTime @default(now()) @db.DateTime
+
+  // Relations
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageAccount BrokerageAccount @relation(fields: [brokerageAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // One rate per timeframe per account
+  @@unique([brokerageAccountId, timeframe])
+  @@index([userId])
+  @@index([brokerageAccountId])
+  @@map("brokerReturnRates")
+}
+
+// ============================================================================
+// USER ACTIVITY TRACKING (Analytics)
+// ============================================================================
+
+// UserSession - Tracks user login sessions for analytics
+// Stores IP address, user agent, and login timestamps
+// Used for usage reports and security auditing
+model UserSession {
+  id        String   @id @default(uuid()) @db.UniqueIdentifier
+  userId    String   @db.UniqueIdentifier
+
+  // Session metadata
+  ipAddress   String?  @db.VarChar(45)  // IPv4 or IPv6 address
+  userAgent   String?  @db.VarChar(500) // Browser/device info
+  country     String?  @db.VarChar(2)   // ISO 3166-1 alpha-2 country code (optional)
+
+  // Timestamps
+  loginAt     DateTime @default(now()) @db.DateTime
+  lastActiveAt DateTime @default(now()) @db.DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, loginAt])
+  @@index([loginAt])
+  @@map("userSessions")
+}
+
+// PageViewEvent - Tracks page/section views for analytics
+// Lightweight tracking for understanding user behavior
+// Fire-and-forget writes for minimal performance impact
+model PageViewEvent {
+  id        String   @id @default(uuid()) @db.UniqueIdentifier
+  userId    String   @db.UniqueIdentifier
+
+  // View metadata
+  page        String  @db.VarChar(100)  // Page path (e.g., "/dashboard", "/positions")
+  section     String? @db.VarChar(50)   // Dashboard section (e.g., "charts-calendar", "options-analytics")
+
+  // Timestamp
+  viewedAt    DateTime @default(now()) @db.DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, viewedAt])
+  @@index([page])
+  @@index([section])
+  @@index([viewedAt])
+  @@map("pageViewEvents")
+}
+
+// ============================================================================
+// AI INSIGHTS ACTION STATE
+// ============================================================================
+
+// AIActionState - Tracks per-user action lifecycle and feedback
+// Used to persist dismiss/snooze/complete and helpfulness feedback
+model AIActionState {
+  id            String    @id @default(uuid()) @db.UniqueIdentifier
+  userId        String    @db.UniqueIdentifier
+  actionId      String    @db.VarChar(128) // Stable action identifier
+
+  // Lifecycle state
+  status        String?   @db.VarChar(20) // dismissed | snoozed | completed
+  snoozedUntil  DateTime? @db.DateTime
+
+  // Feedback
+  feedback      String?   @db.VarChar(20) // helpful | not_helpful
+  feedbackAt    DateTime? @db.DateTime
+
+  // Timestamps
+  createdAt     DateTime  @default(now()) @db.DateTime
+  updatedAt     DateTime  @updatedAt @db.DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, actionId])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, snoozedUntil])
+  @@map("aiActionStates")
+}
+
+// SentimentEntry - User's market sentiment log for a specific timeframe
+model SentimentEntry {
+  id        String   @id @default(uuid()) @db.UniqueIdentifier
+  userId    String   @db.UniqueIdentifier
+  sentiment String   @db.VarChar(20) // bullish | neutral | bearish
+  timeframe String   @db.VarChar(30) // eod | this_week | this_month | this_quarter
+  notes     String?  @db.NVarChar(500)
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  editHistory   SentimentEditHistory[]
+
+  @@unique([userId, timeframe])
+  @@index([userId])
+  @@index([userId, updatedAt])
+  @@map("sentimentEntries")
+}
+
+// SentimentEditHistory - Tracks changes to sentiment entries
+model SentimentEditHistory {
+  id                String   @id @default(uuid()) @db.UniqueIdentifier
+  sentimentEntryId  String   @db.UniqueIdentifier
+  previousSentiment String   @db.VarChar(20)
+  previousNotes     String?  @db.NVarChar(500)
+  editedAt          DateTime @default(now()) @db.DateTime
+
+  sentimentEntry SentimentEntry @relation(fields: [sentimentEntryId], references: [id], onDelete: Cascade)
+
+  @@index([sentimentEntryId, editedAt])
+  @@map("sentimentEditHistory")
+}
+
+// ============================================================================
+// MARKET DATA CACHE (Event-driven; populated on user-triggered workflows)
+// ============================================================================
+
+// MarketPriceBar - Cached normalized OHLCV bars keyed by symbol/interval/date
+model MarketPriceBar {
+  id String @id @default(uuid()) @db.UniqueIdentifier
+
+  symbol   String @db.VarChar(20)
+  interval String @db.VarChar(10) // 1d | 1wk | 1mo
+  barDate  DateTime @db.Date
+
+  open   Decimal @db.Decimal(18, 6)
+  high   Decimal @db.Decimal(18, 6)
+  low    Decimal @db.Decimal(18, 6)
+  close  Decimal @db.Decimal(18, 6)
+  volume Decimal @db.Decimal(18, 6)
+
+  source    String   @default("yahoo-finance2") @db.VarChar(40)
+  fetchedAt DateTime @default(now()) @db.DateTime
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  @@unique([symbol, interval, barDate])
+  @@index([symbol, interval, barDate])
+  @@index([symbol, fetchedAt])
+  @@map("marketPriceBars")
+}
+
+// MarketQuoteSnapshot - Cached latest quote data for fast recommendation requests
+model MarketQuoteSnapshot {
+  id String @id @default(uuid()) @db.UniqueIdentifier
+
+  symbol String @unique @db.VarChar(20)
+
+  price         Decimal @db.Decimal(18, 6)
+  dayChangePct  Decimal @default(0) @db.Decimal(10, 6)
+  previousClose Decimal? @db.Decimal(18, 6)
+  quoteAsOf     DateTime @db.DateTime
+
+  source    String   @default("yahoo-finance2") @db.VarChar(40)
+  isDelayed Boolean  @default(true) @db.Bit
+  fetchedAt DateTime @default(now()) @db.DateTime
+  createdAt DateTime @default(now()) @db.DateTime
+  updatedAt DateTime @updatedAt @db.DateTime
+
+  @@index([symbol, fetchedAt])
+  @@map("marketQuoteSnapshots")
+}
+
+// ============================================================================
+// QUANT RESEARCH & GOVERNANCE
+// ============================================================================
+
+// QuantModelRegistry - Versioned model metadata for auditability and reproducibility
+model QuantModelRegistry {
+  id String @id @default(uuid()) @db.UniqueIdentifier
+
+  // Null userId means shared/community model
+  userId String? @db.UniqueIdentifier
+  scope  String  @db.VarChar(20)  // personal | community
+
+  // Model identity
+  modelFamily          String @db.VarChar(100) // wheel, options, stocks, regime, etc.
+  modelName            String @db.VarChar(100)
+  semanticVersion      String @db.VarChar(30)  // e.g., 1.2.0
+  featureSchemaVersion String @db.VarChar(30)  // e.g., stock-v1
+  trainingDatasetHash  String @db.VarChar(128) // hash of train dataset snapshot
+
+  // Lifecycle
+  status   String  @default("draft") @db.VarChar(20) // draft | stable | archived
+  isStable Boolean @default(false) @db.Bit
+
+  // Metrics and metadata snapshots
+  metricsSnapshot String? @db.NVarChar(Max) // JSON
+  metadata        String? @db.NVarChar(Max) // JSON
+
+  // Timestamps
+  trainedAt DateTime? @db.DateTime
+  createdAt DateTime  @default(now()) @db.DateTime
+  updatedAt DateTime  @updatedAt @db.DateTime
+
+  // Relations
+  user        User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  evaluations QuantModelEvaluation[]
+
+  @@index([userId])
+  @@index([scope, modelFamily, modelName, isStable])
+  @@index([scope, modelFamily, modelName, semanticVersion])
+  @@map("quantModelRegistry")
+}
+
+// QuantModelEvaluation - Walk-forward/OOS/drift evaluation snapshots per model version
+model QuantModelEvaluation {
+  id String @id @default(uuid()) @db.UniqueIdentifier
+
+  userId          String? @db.UniqueIdentifier
+  modelRegistryId String  @db.UniqueIdentifier
+
+  evaluationType String @db.VarChar(40) // walk_forward, oos, calibration, drift
+  windowStart    DateTime? @db.DateTime
+  windowEnd      DateTime? @db.DateTime
+
+  metrics          String  @db.NVarChar(Max) // JSON
+  calibrationScore Decimal? @db.Decimal(10, 6)
+  driftScore       Decimal? @db.Decimal(10, 6)
+
+  createdAt DateTime @default(now()) @db.DateTime
+
+  // Relations
+  user  User?              @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  model QuantModelRegistry @relation(fields: [modelRegistryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId])
+  @@index([modelRegistryId, createdAt])
+  @@map("quantModelEvaluations")
+}
+
+// QuantBacktestRun - Persisted alpha-lab runs for queueing/polling and audit trail
+model QuantBacktestRun {
+  id String @id @default(uuid()) @db.UniqueIdentifier
+
+  userId String @db.UniqueIdentifier
+
+  // Request payload
+  strategyKey String  @db.VarChar(80)
+  symbol      String? @db.VarChar(20)
+  configJson  String  @db.NVarChar(Max)
+
+  // Result payload
+  status      String  @default("pending") @db.VarChar(20) // pending | running | completed | failed
+  metricsJson String? @db.NVarChar(Max)
+  equityCurve String? @db.NVarChar(Max)
+  errorMessage String? @db.NVarChar(1000)
+
+  startedAt   DateTime? @db.DateTime
+  completedAt DateTime? @db.DateTime
+  createdAt   DateTime  @default(now()) @db.DateTime
+  updatedAt   DateTime  @updatedAt @db.DateTime
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@map("quantBacktestRuns")
+}
+
+// ============================================================================
+// ML/DL FOR WHEEL STRATEGY
+// ============================================================================
+
+// WheelMLModel - Stores trained TensorFlow.js models for wheel strategy predictions
+// Each user can have multiple model types (candidate-ranker, strike-optimizer, roll-advisor)
+// Models are stored as binary weights + JSON topology for Azure compatibility
+model WheelMLModel {
+  id            String   @id @default(uuid()) @db.UniqueIdentifier
+  userId        String   @db.UniqueIdentifier
+  modelType     String   @db.VarChar(50) // candidate-ranker, strike-optimizer, roll-advisor
+
+  // Versioning
+  version       Int      @default(1) @db.Int
+
+  // Model artifacts - TensorFlow.js format
+  modelTopology String   @db.NVarChar(Max) // model.json topology as JSON string
+  modelWeights  Bytes                      // Binary weights (varbinary(max) in MSSQL)
+
+  // Training metadata
+  accuracy      Decimal? @db.Decimal(5, 4)  // Model accuracy (0.0000-1.0000)
+  loss          Decimal? @db.Decimal(10, 6) // Final training loss
+  tradesUsed    Int?     @db.Int            // Number of trades used for training
+  epochsTrained Int?     @db.Int            // Number of training epochs
+  trainingStats String?  @db.NVarChar(Max)  // JSON with detailed training stats
+
+  // Status
+  trainedAt     DateTime @default(now()) @db.DateTime
+  isActive      Boolean  @default(true) @db.Bit
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Only one active model per type per user
+  @@unique([userId, modelType, isActive])
+  @@index([userId])
+  @@index([userId, modelType])
+  @@map("wheelMLModels")
+}
+
+// WheelPrediction - Stores model predictions for accuracy tracking
+// Used to measure prediction quality and improve models over time
+model WheelPrediction {
+  id              String   @id @default(uuid()) @db.UniqueIdentifier
+  userId          String   @db.UniqueIdentifier
+
+  // Prediction details
+  predictionType  String   @db.VarChar(30) // ranking, strike_dte, roll
+  symbol          String   @db.VarChar(20)
+  prediction      String   @db.NVarChar(Max) // JSON serialized prediction output
+
+  // Outcome tracking (filled in later)
+  actualOutcome   String?  @db.NVarChar(Max) // JSON of what actually happened
+  wasAccurate     Boolean? @db.Bit           // Was the prediction correct?
+
+  // Timestamps
+  createdAt       DateTime @default(now()) @db.DateTime
+  resolvedAt      DateTime? @db.DateTime     // When outcome was recorded
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, predictionType])
+  @@index([symbol])
+  @@map("wheelPredictions")
+}
+
+// WheelTrainingData - Pre-computed feature snapshots for model training
+// Captures features at trade entry and outcomes for supervised learning
+model WheelTrainingData {
+  id              String   @id @default(uuid()) @db.UniqueIdentifier
+  userId          String   @db.UniqueIdentifier
+  realizedCloseId String?  @db.UniqueIdentifier // Link to the source trade
+
+  // Trade identification
+  symbol          String   @db.VarChar(20)
+  strategy        String   @db.VarChar(30) // cash_secured_put, covered_call
+
+  // Feature snapshot at time of trade entry
+  features        String   @db.NVarChar(Max) // JSON serialized feature vector
+
+  // Outcome labels for training
+  totalReturn     Decimal  @db.Decimal(18, 6)
+  annualizedReturn Decimal? @db.Decimal(18, 6)
+  wasSuccessful   Boolean  @db.Bit           // P&L > 0?
+  wasAssigned     Boolean  @db.Bit           // Was option assigned?
+  holdDays        Int      @db.Int
+
+  // Trade dates for reference
+  tradeDate       DateTime @db.DateTime
+  closeDate       DateTime @db.DateTime
+
+  // Timestamps
+  createdAt       DateTime @default(now()) @db.DateTime
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, symbol])
+  @@index([userId, strategy])
+  @@map("wheelTrainingData")
+}
+
+// CommunityMLModel - Stores aggregated ML models trained on all users' data
+// No foreign key to User - these are system-wide models
+model CommunityMLModel {
+  id            String   @id @default(uuid()) @db.UniqueIdentifier
+
+  // Model identification
+  modelType     String   @db.VarChar(50) // aggregated-ranker, etc.
+
+  // Versioning
+  version       Int      @default(1) @db.Int
+
+  // Model artifacts - TensorFlow.js format
+  modelTopology String   @db.NVarChar(Max) // model.json topology as JSON string
+  modelWeights  Bytes                      // Binary weights (varbinary(max) in MSSQL)
+
+  // Training metadata
+  accuracy      Decimal? @db.Decimal(5, 4)  // Model accuracy (0.0000-1.0000)
+  loss          Decimal? @db.Decimal(10, 6) // Final training loss
+  tradesUsed    Int?     @db.Int            // Number of trades used for training
+  epochsTrained Int?     @db.Int            // Number of training epochs
+  trainingStats String?  @db.NVarChar(Max)  // JSON with detailed training stats
+
+  // Privacy tracking
+  uniqueUsers   Int?     @db.Int            // Number of unique users in training data
+  tickersUsed   Int?     @db.Int            // Number of tickers in training data
+
+  // Status
+  trainedAt     DateTime @default(now()) @db.DateTime
+  isActive      Boolean  @default(true) @db.Bit
+
+  // Only one active model per type
+  @@unique([modelType, isActive])
+  @@index([modelType])
+  @@map("communityMLModels")
+}
+
+// ============================================================================
+// ML/DL FOR ALL OPTIONS TRADING
+// ============================================================================
+
+// OptionsMLModel - Stores trained models for general options predictions
+// Extends beyond wheel strategy to all options strategies
+model OptionsMLModel {
+  id            String   @id @default(uuid()) @db.UniqueIdentifier
+  userId        String   @db.UniqueIdentifier
+
+  // Model identification
+  modelType     String   @db.VarChar(50) // volatility-regime, entry-timing, exit-strategy, strategy-classifier, risk-analyzer, etc.
+  modelName     String   @db.VarChar(100) // Human-readable name
+
+  // Versioning
+  version       Int      @default(1) @db.Int
+
+  // Model artifacts - TensorFlow.js format
+  modelTopology String   @db.NVarChar(Max) // model.json topology as JSON string
+  modelWeights  Bytes                      // Binary weights (varbinary(max) in MSSQL)
+
+  // Architecture metadata
+  architecture  String?  @db.NVarChar(Max) // JSON describing layers, units, activations
+
+  // Training metadata
+  accuracy      Decimal? @db.Decimal(5, 4)  // Model accuracy (0.0000-1.0000)
+  loss          Decimal? @db.Decimal(10, 6) // Final training loss
+  valLoss       Decimal? @db.Decimal(10, 6) // Validation loss
+  tradesUsed    Int?     @db.Int            // Number of trades used for training
+  epochsTrained Int?     @db.Int            // Number of training epochs
+  trainingStats String?  @db.NVarChar(Max)  // JSON with detailed training stats
+
+  // Status
+  trainedAt     DateTime @default(now()) @db.DateTime
+  isActive      Boolean  @default(true) @db.Bit
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Only one active model per type per user
+  @@unique([userId, modelType, isActive])
+  @@index([userId])
+  @@index([userId, modelType])
+  @@map("optionsMLModels")
+}
+
+// FeatureStore - Pre-computed and cached ML features
+// Reduces computation overhead and enables feature reuse across models
+model FeatureStore {
+  id            String   @id @default(uuid()) @db.UniqueIdentifier
+  userId        String   @db.UniqueIdentifier
+
+  // Feature identification
+  symbol        String   @db.VarChar(20)
+  featureType   String   @db.VarChar(50) // volatility, momentum, user_pattern, symbol_profile, etc.
+
+  // Feature data
+  features      String   @db.NVarChar(Max) // JSON serialized feature vector
+  featureCount  Int      @db.Int           // Number of features in vector
+
+  // Time window this feature represents
+  windowStart   DateTime? @db.DateTime
+  windowEnd     DateTime? @db.DateTime
+
+  // Cache management
+  computedAt    DateTime @default(now()) @db.DateTime
+  expiresAt     DateTime @db.DateTime
+  isValid       Boolean  @default(true) @db.Bit
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, symbol, featureType])
+  @@index([userId, expiresAt])
+  @@index([userId, symbol])
+  @@index([userId, featureType])
+  @@map("featureStore")
+}
+
+// TradeEmbedding - Vector embeddings for trade similarity search
+// Enables "find similar trades" functionality
+model TradeEmbedding {
+  id              String   @id @default(uuid()) @db.UniqueIdentifier
+  userId          String   @db.UniqueIdentifier
+  realizedCloseId String?  @db.UniqueIdentifier // Link to source trade
+
+  // Trade identification
+  symbol          String   @db.VarChar(20)
+  strategy        String   @db.VarChar(30)
+
+  // Embedding vector (stored as JSON array of floats)
+  embedding       String   @db.NVarChar(Max) // JSON array [0.123, -0.456, ...]
+  embeddingDim    Int      @db.Int           // Dimensionality (e.g., 32, 64)
+
+  // Trade outcome for similarity queries
+  outcome         String   @db.VarChar(10)   // win, loss, breakeven
+  pnlPercent      Decimal  @db.Decimal(10, 4)
+  holdDays        Int      @db.Int
+
+  // Feature snapshot used to create embedding
+  features        String?  @db.NVarChar(Max) // Original features (for debugging)
+
+  // Timestamps
+  tradeDate       DateTime @db.DateTime
+  createdAt       DateTime @default(now()) @db.DateTime
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, symbol])
+  @@index([userId, strategy])
+  @@index([userId, outcome])
+  @@map("tradeEmbeddings")
+}
+
+// DailyInsight - Generated daily trading insights
+// Personalized briefings and recommendations
+model DailyInsight {
+  id              String   @id @default(uuid()) @db.UniqueIdentifier
+  userId          String   @db.UniqueIdentifier
+
+  // Insight date
+  insightDate     DateTime @db.Date
+
+  // Summary metrics (JSON)
+  summary         String   @db.NVarChar(Max) // { totalPositions, netDelta, dailyTheta, unrealizedPnL }
+
+  // Action items (JSON array)
+  actionItems     String   @db.NVarChar(Max) // [{ type, symbol, priority, description, recommendation }]
+
+  // Opportunities (JSON array)
+  opportunities   String   @db.NVarChar(Max) // [{ symbol, strategy, confidence, reasoning }]
+
+  // Risk alerts (JSON array)
+  riskAlerts      String   @db.NVarChar(Max) // [{ type, severity, description, action }]
+
+  // Learning insights (JSON array of strings)
+  learnings       String?  @db.NVarChar(Max) // ["Pattern: X", "Suggestion: Y"]
+
+  // Generation metadata
+  generatedAt     DateTime @default(now()) @db.DateTime
+  modelVersion    String?  @db.VarChar(50)  // Which model version generated this
+
+  // User interaction
+  wasViewed       Boolean  @default(false) @db.Bit
+  viewedAt        DateTime? @db.DateTime
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, insightDate])
+  @@index([userId])
+  @@index([userId, insightDate])
+  @@map("dailyInsights")
+}
+
+// PositionHealthAlert - Real-time position monitoring alerts
+// Generated when positions need attention
+model PositionHealthAlert {
+  id              String   @id @default(uuid()) @db.UniqueIdentifier
+  userId          String   @db.UniqueIdentifier
+  positionId      String?  @db.UniqueIdentifier // Link to DerivedPosition
+
+  // Alert details
+  alertType       String   @db.VarChar(50)  // THETA_DECAY, APPROACHING_EXPIRY, ADVERSE_MOVE, PROFIT_TARGET, etc.
+  severity        String   @db.VarChar(20)  // info, warning, critical
+  symbol          String   @db.VarChar(20)
+
+  // Alert content
+  title           String   @db.NVarChar(200)
+  description     String   @db.NVarChar(Max)
+  recommendation  String?  @db.NVarChar(Max)
+
+  // Context data (JSON)
+  context         String?  @db.NVarChar(Max) // { currentPrice, strike, daysToExpiry, pnl, etc. }
+
+  // Status
+  createdAt       DateTime @default(now()) @db.DateTime
+  expiresAt       DateTime? @db.DateTime     // Alert no longer relevant after this
+  isDismissed     Boolean  @default(false) @db.Bit
+  dismissedAt     DateTime? @db.DateTime
+  isActioned      Boolean  @default(false) @db.Bit // User took recommended action
+  actionedAt      DateTime? @db.DateTime
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, alertType])
+  @@index([userId, isDismissed])
+  @@index([userId, createdAt])
+  @@map("positionHealthAlerts")
+}
+
+// MLPredictionLog - Stores all ML predictions for accuracy tracking
+// Unified prediction tracking across all model types
+model MLPredictionLog {
+  id              String   @id @default(uuid()) @db.UniqueIdentifier
+  userId          String   @db.UniqueIdentifier
+
+  // Model that made prediction
+  modelType       String   @db.VarChar(50)  // volatility-regime, entry-timing, etc.
+  modelVersion    Int      @db.Int
+
+  // Prediction details
+  symbol          String?  @db.VarChar(20)
+  predictionType  String   @db.VarChar(30)  // regime, score, recommendation, etc.
+  prediction      String   @db.NVarChar(Max) // JSON serialized prediction
+  confidence      Decimal? @db.Decimal(5, 4) // 0.0000-1.0000
+  uncertainty     Decimal? @db.Decimal(5, 4) // For ensemble models
+
+  // Outcome tracking
+  actualOutcome   String?  @db.NVarChar(Max) // JSON of what happened
+  wasAccurate     Boolean? @db.Bit
+  errorMagnitude  Decimal? @db.Decimal(10, 4) // For regression: |predicted - actual|
+
+  // Timestamps
+  createdAt       DateTime @default(now()) @db.DateTime
+  resolvedAt      DateTime? @db.DateTime
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, modelType])
+  @@index([userId, wasAccurate])
+  @@map("mlPredictionLogs")
+}
+
+// StrategySimulation - Stores strategy simulation results
+// For the strategy simulator feature
+model StrategySimulation {
+  id              String   @id @default(uuid()) @db.UniqueIdentifier
+  userId          String   @db.UniqueIdentifier
+
+  // Simulation parameters
+  symbol          String   @db.VarChar(20)
+  strategy        String   @db.VarChar(30)  // long_call, covered_call, iron_condor, etc.
+  strike          Decimal? @db.Decimal(18, 6)
+  strike2         Decimal? @db.Decimal(18, 6) // For spreads
+  dte             Int      @db.Int
+  positionSize    Int      @db.Int           // Number of contracts
+
+  // Simulation results (JSON)
+  expectedOutcomes String  @db.NVarChar(Max) // [{ scenario, probability, pnl }]
+  riskMetrics     String   @db.NVarChar(Max) // { maxLoss, breakeven, pop }
+  historicalComp  String?  @db.NVarChar(Max) // { similarTrades, winRate, avgReturn }
+
+  // Greeks at simulation time
+  estimatedDelta  Decimal? @db.Decimal(10, 6)
+  estimatedTheta  Decimal? @db.Decimal(10, 6)
+  estimatedVega   Decimal? @db.Decimal(10, 6)
+
+  // Timestamp
+  createdAt       DateTime @default(now()) @db.DateTime
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, symbol])
+  @@index([userId, strategy])
+  @@map("strategySimulations")
+}
+
+// ============================================================================
+// TRADE CLASSIFICATION (Calendar feature)
+// ============================================================================
+
+// TradeClassification - User overrides for trade type (daytrade/swingtrade)
+// Keyed by immutable composite fields so overrides survive re-derivation
+model TradeClassification {
+  id         String    @id @default(uuid()) @db.UniqueIdentifier
+  userId     String    @db.UniqueIdentifier
+  symbol     String    @db.VarChar(20)
+  openDate   DateTime  @db.DateTime
+  closeDate  DateTime  @db.DateTime
+  closeType  String    @db.VarChar(10)
+  optionType String?   @db.VarChar(4)
+  strike     Decimal?  @db.Decimal(18, 6)
+  expiration DateTime? @db.Date
+  tradeType  String    @db.VarChar(20) // daytrade, swingtrade
+  createdAt  DateTime  @default(now()) @db.DateTime
+  updatedAt  DateTime  @updatedAt @db.DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, symbol, openDate, closeDate, closeType, optionType, strike, expiration])
+  @@index([userId])
+  @@map("tradeClassifications")
+}
+
+// ============================================================================
+// AVIN AI CHAT
+// ============================================================================
+
+// Conversation - A chat thread between a user and Avin
+model Conversation {
+  id         String   @id @default(uuid()) @db.UniqueIdentifier
+  userId     String   @db.UniqueIdentifier
+  title      String   @db.NVarChar(200)
+  isArchived Boolean  @default(false) @db.Bit
+  createdAt  DateTime @default(now()) @db.DateTime
+  updatedAt  DateTime @updatedAt @db.DateTime
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, isArchived])
+  @@map("conversations")
+}
+
+// ChatMessage - Individual message in a conversation
+model ChatMessage {
+  id             String   @id @default(uuid()) @db.UniqueIdentifier
+  conversationId String   @db.UniqueIdentifier
+  role           String   @db.VarChar(20) // 'user' | 'assistant' | 'tool'
+  content        String   @db.NVarChar(Max)
+  toolCallId     String?  @db.VarChar(100)
+  toolName       String?  @db.VarChar(50)
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  createdAt      DateTime @default(now()) @db.DateTime
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("chatMessages")
+}
+
+// ============================================================================
+// TSLA THESIS — AI-updated market data for the public thesis page
+// ============================================================================
+
+model TslaThesisData {
+  id        String   @id @default("singleton") @db.VarChar(20)
+  data      String   @db.NVarChar(Max) // JSON blob with market data
+  updatedAt DateTime @default(now()) @db.DateTime
+  updatedBy String   @default("manual") @db.VarChar(50)
+
+  @@map("tslaThesisData")
+}
